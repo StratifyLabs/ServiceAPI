@@ -127,6 +127,7 @@ public:
 			const var::String& version
 			) const;
 
+	bool is_update_available(const var::String& current_version);
 
 	bool operator < (const var::VersionString & version) const {
 		return compare(version) < 0;

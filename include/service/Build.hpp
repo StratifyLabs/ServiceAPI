@@ -135,6 +135,7 @@ public:
 	JSON_ACCESS_STRING(Build,permissions);
 	JSON_ACCESS_STRING_WITH_KEY(Build,projectId,project_id);
 	JSON_ACCESS_ARRAY_WITH_KEY(Build,BuildImageInfo,buildList,build_image_list);
+	JSON_ACCESS_STRING_ARRAY_WITH_KEY(Build,buildList,build_image_list_20200518); //migration list
 	JSON_ACCESS_STRING_WITH_KEY(Build,ramSize,ram_size);
 	JSON_ACCESS_BOOL_WITH_KEY(Build,isBuildImage,image_included);
 
@@ -262,6 +263,8 @@ private:
 			const var::String & path,
 			const var::String & build
 			);
+
+	void migrate_build_info_list_20200518();
 
 
 

@@ -317,6 +317,7 @@ var::String Project::get_build_id(
 	return build_id;
 }
 
+
 int Project::compare(const var::VersionString & version) const {
 	ProjectBuildList build_list = this->get_build_list();
 	VersionString latest_version;

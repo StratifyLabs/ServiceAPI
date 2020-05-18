@@ -16,6 +16,13 @@ class InstallerOptions {
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,project_id);
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,team_id);
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,url);
+	API_ACCESS_BOOL(InstallerOptions,update_os,false);
+	API_ACCESS_BOOL(InstallerOptions,update_apps,false);
+
+
+	//update directories
+	API_ACCESS_COMPOUND(InstallerOptions,var::String,update_app_directories);
+
 
 	//path is a path to a project
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,project_path);
@@ -63,6 +70,15 @@ public:
 
 };
 
+class InstallerAppUpdate {
+	API_ACCESS_COMPOUND(InstallerAppUpdate,var::String,path);
+	API_ACCESS_COMPOUND(InstallerAppUpdate,sys::AppfsInfo,info);
+
+public:
+	bool is_valid() const { return path().is_empty() == false; }
+
+};
+
 class Installer : public cloud::CloudObject {
 public:
 	Installer(sys::Link * connection);
@@ -85,6 +101,14 @@ private:
 	bool install_id(const InstallerOptions& options);
 	bool install_path(const InstallerOptions& options);
 	bool install_binary(const InstallerOptions& options);
+
+	var::Vector<InstallerAppUpdate> get_app_update_list(const InstallerOptions& options);
+	var::Vector<InstallerAppUpdate> get_app_update_list_from_directory(const var::String& directory_path, const InstallerOptions& options);
+	bool update_apps(
+			const var::Vector<InstallerAppUpdate>& app_list,
+			const InstallerOptions& options
+			);
+	bool update_os(const InstallerOptions& options);
 
 	bool import_build_from_project_path(
 			const InstallerOptions& options
@@ -119,6 +143,8 @@ private:
 			const fs::File& image,
 			const InstallerOptions& options
 			);
+
+	bool reconnect(const InstallerOptions& options);
 
 	int kill_application(int app_pid);
 	int clean_application();

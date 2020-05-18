@@ -174,6 +174,8 @@ int Build::download(const BuildOptions& options){
 		return -1;
 	}
 
+	migrate_build_info_list_20200518();
+
 	//download the build images
 	if( !options.build_name().is_empty() ){
 		BuildImageInfo image_info =
@@ -578,8 +580,8 @@ JsonObject Build::import_disassembly(
 	String binary_hash;
 
 	PRINTER_TRACE(printer,
-				"check if binary file exists " + binary_path
-				);
+								"check if binary file exists " + binary_path
+								);
 
 	if( File::exists(
 				binary_path
@@ -587,8 +589,8 @@ JsonObject Build::import_disassembly(
 		binary_path << ".bin";
 
 		PRINTER_TRACE(printer,
-					"check if other binary file exists " + binary_path
-					);
+									"check if other binary file exists " + binary_path
+									);
 
 		if( File::exists(
 					binary_path
@@ -598,8 +600,8 @@ JsonObject Build::import_disassembly(
 	}
 
 	PRINTER_TRACE(printer,
-				"check if lst file exists " + lst_path
-				);
+								"check if lst file exists " + lst_path
+								);
 
 	if( File::exists(
 				lst_path
@@ -612,8 +614,8 @@ JsonObject Build::import_disassembly(
 				<< ".lst";
 
 		PRINTER_TRACE(printer,
-					"check if other lst file exists " + lst_path
-					);
+									"check if other lst file exists " + lst_path
+									);
 
 		if( File::exists(
 					lst_path
@@ -624,16 +626,16 @@ JsonObject Build::import_disassembly(
 	}
 
 	PRINTER_TRACE(printer,
-				"calculate hash for file " + binary_path
-				);
+								"calculate hash for file " + binary_path
+								);
 
 	binary_hash = crypto::Sha256::calculate(
 				binary_path
 				);
 
 	PRINTER_TRACE(printer,
-				"check for json file " + json_path
-				);
+								"check for json file " + json_path
+								);
 
 	if( File::exists(
 				json_path
@@ -645,8 +647,8 @@ JsonObject Build::import_disassembly(
 
 
 		PRINTER_TRACE(printer,
-					"return existing disassembly info " + json_path
-					);
+									"return existing disassembly info " + json_path
+									);
 
 		if( object.at(("info"))
 				.to_object().at(("binaryHash"))
@@ -657,8 +659,8 @@ JsonObject Build::import_disassembly(
 	}
 
 	PRINTER_TRACE(printer,
-				"open lst file " + lst_path
-				);
+								"open lst file " + lst_path
+								);
 
 	if( f.open(
 				lst_path,
@@ -704,8 +706,8 @@ JsonObject Build::import_disassembly(
 	data_file.reference() = contents;
 
 	PRINTER_TRACE(printer,
-				"parsing disassembly file" + lst_path
-				);
+								"parsing disassembly file" + lst_path
+								);
 
 	std::function<String(const Tokenizer& tokenizer)> find_address =
 			[](const Tokenizer& tokenizer) -> String {
@@ -998,4 +1000,29 @@ var::String Build::normalize_name(const var::String & build_name) const {
 	}
 
 	return result;
+}
+
+void Build::migrate_build_info_list_20200518(){
+	JsonArray build_list_array = to_object().at("buildList");
+
+	Vector<BuildImageInfo> migrated_list;
+
+	for(u32 i=0; i < build_list_array.count(); i++){
+		if( build_list_array.at(i).is_string() == false ){
+			return;
+		}
+
+		migrated_list.push_back(
+					BuildImageInfo()
+					.set_name( build_list_array.at(i).to_string() )
+					.set_image("")
+					.set_hash("")
+					.set_secret_key_position(0)
+					.set_secret_key_size(0)
+					.set_secret_key("")
+					);
+	}
+
+	set_build_image_list( migrated_list );
+
 }

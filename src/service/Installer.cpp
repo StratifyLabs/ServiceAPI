@@ -21,6 +21,31 @@ bool Installer::install(const InstallerOptions& options){
 		set_architecture( options.architecture() );
 	}
 
+	Vector<InstallerAppUpdate> app_update_list;
+	if( options.is_update_apps() ){
+		app_update_list = get_app_update_list(options);
+	}
+
+	if( options.is_update_os() ){
+		if( update_os(
+					InstallerOptions(options)
+					.set_reconnect(options.is_reconnect() ||  options.is_update_apps())
+					) == false ){
+			return false;
+		}
+
+		if( options.is_update_apps() == false ){
+			return true;
+		} else {
+			//need to reconnect
+		}
+	}
+
+	if( options.is_update_apps()  ){
+		return update_apps(app_update_list, options);
+	}
+
+
 	if( !options.url().is_empty() ){
 		CLOUD_PRINTER_TRACE("install from url " + options.url());
 		return install_url(options);
@@ -79,7 +104,6 @@ bool Installer::install_id(const InstallerOptions& options){
 	b.set_application_architecture( architecture() );
 
 	CLOUD_PRINTER_TRACE("setting architecture " + b.application_architecture());
-
 
 	String cloud_storage_path =
 			p.get_storage_path(
@@ -190,6 +214,123 @@ bool Installer::install_path(const InstallerOptions& options){
 	}
 
 	return install_build(b, options);
+}
+
+var::Vector<InstallerAppUpdate> Installer::get_app_update_list(const InstallerOptions& options){
+	var::Vector<InstallerAppUpdate> result;
+	StringList directory_list = options.update_app_directories().split("?");
+	for(const auto & item: directory_list){
+		result << get_app_update_list_from_directory(item, options);
+	}
+	return result;
+}
+
+var::Vector<InstallerAppUpdate> Installer::get_app_update_list_from_directory(
+		const var::String& directory_path,
+		const InstallerOptions& options){
+	var::Vector<InstallerAppUpdate> result;
+
+	StringList directory_list =
+			Dir::read_list(directory_path, Dir::IsRecursive(false), Dir::LinkDriver(connection()->driver()));
+
+	for(const String& item: directory_list){
+		String full_path = directory_path + "/" + item;
+		AppfsInfo info = Appfs::get_info(full_path, File::LinkDriver(connection()->driver()));
+		if( info.is_valid() ){
+			result.push_back(
+						InstallerAppUpdate()
+						.set_info(info)
+						.set_path(full_path)
+						);
+		}
+	}
+
+	return result;
+}
+
+bool Installer::update_apps(
+		const var::Vector<InstallerAppUpdate>& app_list,
+		const InstallerOptions& options
+		){
+	for(const InstallerAppUpdate& app: app_list){
+		Project app_project;
+
+		app_project.download(
+					ProjectOptions()
+					.set_document_id( app.info().id() )
+					.set_team_id( options.team_id() )
+					);
+
+		VersionString current_version(app.info().version());
+
+		PrinterObject po(printer(), app_project.get_name());
+		printer().key("id", app_project.get_document_id());
+		if( !app_project.get_team_id().is_empty() ){
+			printer().key("team", app_project.get_team_id());
+		}
+		printer().key("type", app_project.get_type());
+		if( app_project > current_version ){
+			printer().key("currentVersion", current_version.string());
+			printer().key("latestVersion", app_project.get_version());
+			printer().key("update", app_project.get_version() + " from " + current_version.string());
+			if( install_id(
+						InstallerOptions(options)
+						.set_os(false)
+						.set_application()
+						.set_project_id( app_project.get_document_id() )
+						.set_team_id( app_project.get_team_id() )
+						) == false ){
+				return false;
+			}
+		} else {
+			printer().key("currentVersion", current_version.string());
+			printer().key("latestVersion", app_project.get_version());
+			printer().key("update", current_version.string() + " is the latest version");
+		}
+	}
+
+	if( app_list.count() == 0 ){
+		printer().key("update", "no apps available to check for updates");
+	}
+
+	return true;
+}
+
+bool Installer::update_os(const InstallerOptions& options){
+
+	Project os_project;
+
+	os_project.download(
+				ProjectOptions()
+				.set_document_id( connection()->sys_info().id() )
+				.set_team_id( connection()->sys_info().team_id() )
+				);
+
+	VersionString current_version(connection()->sys_info().system_version());
+	PrinterObject po(printer(), os_project.get_name());
+	printer().key("id", os_project.get_document_id());
+	if( !os_project.get_team_id().is_empty() ){
+		printer().key("team", os_project.get_team_id());
+	}
+	printer().key("type", os_project.get_type());
+	if( os_project > current_version ){
+		printer().key("currentVersion", current_version.string() );
+		printer().key("latestVersion", os_project.get_version());
+		printer().key("update", os_project.get_version() + " from " + current_version.string());
+		return install_id(
+					InstallerOptions(options)
+					.set_os()
+					.set_application(false)
+					.set_project_id( os_project.get_document_id() )
+					.set_team_id( os_project.get_team_id() )
+					);
+	} else {
+		printer().key("currentVersion", current_version.string());
+		printer().key("latestVersion", os_project.get_version());
+		printer().key("update", current_version.string() + " is the latest version");
+	}
+
+	return true;
 }
 
 bool Installer::install_build(
@@ -487,110 +628,106 @@ bool Installer::install_os_image(
 		return result;
 	}
 
-	if( !connection()->is_bootloader() ){
+	PrinterObject po(printer(), "bootloader");
+	{
+		if( !connection()->is_bootloader() ){
 
-		//bootloader must be invoked
-		CLOUD_PRINTER_TRACE("invoking bootloader");
-		result = connection()->reset_bootloader();
+			//bootloader must be invoked
+			CLOUD_PRINTER_TRACE("invoking bootloader");
+			result = connection()->reset_bootloader();
+			if( result < 0 ){
+				set_error_message("Failed to invoke the bootloader");
+				set_error_message(
+							"Failed to invoke bootloader with connnection"
+							" error message " +
+							connection()->error_message()
+							);
+
+				return false;
+			}
+
+			CLOUD_PRINTER_TRACE(
+						"waiting " +
+						String::number(options.delay().milliseconds()) +
+						"ms"
+						);
+			options.delay().wait();
+
+			//now reconnect to the device
+			reconnect(options);
+		}
+
+		CLOUD_PRINTER_TRACE("Installing OS");
+		Timer transfer_timer;
+		printer().progress_key() = "installing";
+		transfer_timer.start();
+		result = connection()->update_os(
+					image,
+					sys::Link::IsVerify(options.is_verify()),
+					printer(),
+					sys::Link::BootloaderRetryCount(options.retry_reconnect_count())
+					);
+		transfer_timer.stop();
+		printer().progress_key() = "progress";
 		if( result < 0 ){
-			set_error_message("Failed to invoke the bootloader");
-			set_error_message(
-						"Failed to invoke bootloader with connnection"
-						" error message " +
-						connection()->error_message()
+			CLOUD_PRINTER_TRACE(
+						String().format(
+							"failed to install with return value %d -> %s",
+							result,
+							connection()->error_message().cstring()
+							)
 						);
-
 			return false;
 		}
 
-		CLOUD_PRINTER_TRACE(
-					"waiting " +
-					String::number(options.delay().milliseconds()) +
-					"ms"
-					);
-		options.delay().wait();
+		print_transfer_info(image, transfer_timer);
 
-		//now reconnect to the device
-		CLOUD_PRINTER_TRACE("reconnect on " + connection()->info().port());
-		CLOUD_PRINTER_TRACE("retry is " + String::number(options.retry_reconnect_count()));
-		if( connection()->reconnect(
-					sys::Link::RetryCount(options.retry_reconnect_count()),
-					sys::Link::RetryDelay(options.delay())
-					) < 0 ){
-			set_error_message("failed to connect to bootloader");
+		if( connection()->reset() < 0 ){
 			set_error_message(
-						"Failed to connect to bootloader with connnection"
-						" error message " +
+						"Failed to reset the OS with connection error "
+						"message: " +
 						connection()->error_message()
 						);
 			return false;
 		}
-	}
-
-	CLOUD_PRINTER_TRACE("Installing OS");
-	Timer transfer_timer;
-	printer().progress_key() = "installing";
-	transfer_timer.start();
-	result = connection()->update_os(
-				image,
-				sys::Link::IsVerify(options.is_verify()),
-				printer(),
-				sys::Link::BootloaderRetryCount(options.retry_reconnect_count())
-				);
-	transfer_timer.stop();
-	printer().progress_key() = "progress";
-	if( result < 0 ){
-		CLOUD_PRINTER_TRACE(
-					String().format(
-						"failed to install with return value %d -> %s",
-						result,
-						connection()->error_message().cstring()
-						)
-					);
-		return false;
-	}
-	print_transfer_info(image, transfer_timer);
-
-	if( connection()->reset() < 0 ){
-		set_error_message(
-					"Failed to reset the OS with connection error "
-					"message: " +
-					connection()->error_message()
-					);
-		return false;
 	}
 
 	if( options.is_reconnect() ){
-		CLOUD_PRINTER_TRACE(
-					String().format(
-						"reconnect %d retries at %dms intervals",
-						options.retry_reconnect_count(),
-						options.delay().milliseconds()
-						)
-					);
-
-		printer().progress_key() = "reconnecting";
-		for(u32 i=0; i < options.retry_reconnect_count(); i++){
-			if( connection()->reconnect(
-						sys::Link::RetryCount(1),
-						sys::Link::RetryDelay(options.delay())
-						) == 0 ){
-				break;
-			}
-			printer().update_progress(
-						static_cast<int>(i),
-						ProgressCallback::indeterminate_progress_total()
-						);
-		}
-		if( connection()->is_connected() == false ){
-			set_error_message("failed to reconnect: " + connection()->error_message());
-			return false;
-		}
-
-		printer().update_progress(0, 0);
-		printer().progress_key() = "progress";
+		reconnect(options);
 	}
 
+	return true;
+}
+
+bool Installer::reconnect(const InstallerOptions& options){
+	CLOUD_PRINTER_TRACE(
+				String().format(
+					"reconnect %d retries at %dms intervals",
+					options.retry_reconnect_count(),
+					options.delay().milliseconds()
+					)
+				);
+
+	printer().progress_key() = "reconnecting";
+	for(u32 i=0; i < options.retry_reconnect_count(); i++){
+		if( connection()->reconnect(
+					sys::Link::RetryCount(1),
+					sys::Link::RetryDelay(options.delay())
+					) == 0 ){
+			break;
+		}
+		printer().update_progress(
+					static_cast<int>(i),
+					ProgressCallback::indeterminate_progress_total()
+					);
+	}
+	if( connection()->is_connected() == false ){
+		set_error_message("failed to reconnect: " + connection()->error_message());
+		return false;
+	}
+
+	printer().update_progress(0, 0);
+	printer().progress_key() = "progress";
 	return true;
 }
 
