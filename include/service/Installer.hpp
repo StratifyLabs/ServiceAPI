@@ -32,6 +32,7 @@ class InstallerOptions {
 	//application options
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,destination);
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,suffix);
+	API_ACCESS_COMPOUND(InstallerOptions,var::String,architecture);
 	API_ACCESS_BOOL(InstallerOptions,tightly_coupled_data,false);
 	API_ACCESS_BOOL(InstallerOptions,tightly_coupled_code,false);
 	API_ACCESS_BOOL(InstallerOptions,external_data,false);
@@ -110,6 +111,11 @@ private:
 			);
 
 	bool install_application_image(
+			const fs::File& image,
+			const InstallerOptions& options
+			);
+
+	int save_image_locally(
 			const fs::File& image,
 			const InstallerOptions& options
 			);

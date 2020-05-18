@@ -15,6 +15,12 @@ Installer::Installer(sys::Link * link_connection) :
 
 bool Installer::install(const InstallerOptions& options){
 
+	if( connection()->is_connected_and_is_not_bootloader() ){
+		set_architecture( connection()->sys_info().arch() );
+	} else {
+		set_architecture( options.architecture() );
+	}
+
 	if( !options.url().is_empty() ){
 		CLOUD_PRINTER_TRACE("install from url " + options.url());
 		return install_url(options);
@@ -70,9 +76,7 @@ bool Installer::install_id(const InstallerOptions& options){
 
 	CLOUD_PRINTER_TRACE("setting build type " + p.get_type());
 	b.set_type( p.get_type() );
-	b.set_application_architecture(
-				connection()->sys_info().arch()
-				);
+	b.set_application_architecture( architecture() );
 
 	CLOUD_PRINTER_TRACE("setting architecture " + b.application_architecture());
 
@@ -214,9 +218,7 @@ bool Installer::install_application_build(
 		const InstallerOptions& options
 		){
 
-	build.set_application_architecture(
-				connection()->sys_info().arch()
-				);
+	build.set_application_architecture( architecture() );
 
 	DataFile image(OpenFlags::read_write());
 	image.data() = build.get_image(
@@ -335,6 +337,20 @@ bool Installer::install_application_image(
 		const InstallerOptions& options
 		){
 
+	{
+		int result;
+
+		result = save_image_locally(
+					image,
+					InstallerOptions(options)
+					.set_application()
+					);
+
+		if( result >= 0 ){
+			return result;
+		}
+	}
+
 	int app_pid = connection()->get_pid(project_name());
 	if( options.is_kill() ){
 		if( app_pid > 0 ){
@@ -401,7 +417,6 @@ bool Installer::install_application_image(
 		printer().key("name", attributes.name());
 		printer().key("version", version.string());
 		printer().key("id", attributes.id());
-		printer().key("ram", !attributes.is_flash());
 		printer().key("flash", attributes.is_flash());
 		printer().key("startup", attributes.is_startup());
 		printer().key("externalcode", attributes.is_code_external());
@@ -461,44 +476,16 @@ bool Installer::install_os_image(
 		const InstallerOptions& options){
 	int result;
 
-	if( !options.destination().is_empty() ){
-		CLOUD_PRINTER_TRACE("saving image to " + options.destination());
-		String destination;
-		LinkPath link_path(options.destination(), connection()->driver());
-		if( link_path.is_host_path() ){
-			if( link_path.path().is_empty() ){
-				destination =
-						project_name() +
-						"/" +
-						Build().normalize_name(options.build_name()) +
-						"/" +
-						project_name() +
-						".bin";
-			} else {
-				destination = link_path.path();
-			}
 
-			File destination_file;
-			if( destination_file.create(
-						destination,
-						File::IsOverwrite(true)) < 0 ){
-				set_error_message("failed to create destination"
-													"file " + destination);
-				return false;
-			}
+	result = save_image_locally(
+				image,
+				InstallerOptions(options)
+				.set_os()
+				);
 
-			destination_file.write(image);
-			printer().key("destination", "host@" + destination);
-			return true;
-		} else {
-			set_error_message(
-						"cannot write the os directly to the"
-						"device filesystem at " + link_path.path_description()
-						);
-			return false;
-		}
+	if( result >= 0 ){
+		return result;
 	}
-
 
 	if( !connection()->is_bootloader() ){
 
@@ -605,6 +592,60 @@ bool Installer::install_os_image(
 	}
 
 	return true;
+}
+
+int Installer::save_image_locally(
+		const fs::File& image,
+		const InstallerOptions& options
+		){
+	if( !options.destination().is_empty() ){
+		CLOUD_PRINTER_TRACE("saving image to " + options.destination());
+		String destination;
+		LinkPath link_path(options.destination(), connection()->driver());
+
+
+
+		if( link_path.is_host_path() ){
+			if( link_path.path().is_empty() ){
+				destination =
+						project_name() +
+						"_" +
+						Build()
+						.set_type( options.is_os() ? Build::os_type() : Build::application_type() )
+						.set_application_architecture( architecture() )
+						.normalize_name(options.build_name()) +
+						(options.is_os() ?
+							 ".bin" :
+							 "");
+			} else {
+				destination = link_path.path();
+			}
+
+			File destination_file;
+			if( destination_file.create(
+						destination,
+						File::IsOverwrite(true)) < 0 ){
+				set_error_message("failed to create destination"
+													"file " + destination);
+				return 0;
+			}
+
+			destination_file.write(image);
+			printer().key("destination", "host@" + destination);
+			return 1;
+		} else {
+			if( options.is_os() ){
+				set_error_message(
+							"cannot write the os directly to the"
+							"device filesystem at " + link_path.path_description()
+							);
+				return 0;
+			}
+
+			return -1;
+		}
+	}
+	return -1;
 }
 
 

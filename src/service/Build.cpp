@@ -577,7 +577,7 @@ JsonObject Build::import_disassembly(
 	String binary_path = String() << path.argument();
 	String binary_hash;
 
-	printer.debug(
+	PRINTER_TRACE(printer,
 				"check if binary file exists " + binary_path
 				);
 
@@ -586,7 +586,7 @@ JsonObject Build::import_disassembly(
 				) == false ){
 		binary_path << ".bin";
 
-		printer.debug(
+		PRINTER_TRACE(printer,
 					"check if other binary file exists " + binary_path
 					);
 
@@ -597,7 +597,7 @@ JsonObject Build::import_disassembly(
 		}
 	}
 
-	printer.debug(
+	PRINTER_TRACE(printer,
 				"check if lst file exists " + lst_path
 				);
 
@@ -611,7 +611,7 @@ JsonObject Build::import_disassembly(
 				<< build.argument()
 				<< ".lst";
 
-		printer.debug(
+		PRINTER_TRACE(printer,
 					"check if other lst file exists " + lst_path
 					);
 
@@ -623,7 +623,7 @@ JsonObject Build::import_disassembly(
 		}
 	}
 
-	printer.debug(
+	PRINTER_TRACE(printer,
 				"calculate hash for file " + binary_path
 				);
 
@@ -631,7 +631,7 @@ JsonObject Build::import_disassembly(
 				binary_path
 				);
 
-	printer.debug(
+	PRINTER_TRACE(printer,
 				"check for json file " + json_path
 				);
 
@@ -644,7 +644,7 @@ JsonObject Build::import_disassembly(
 					).to_object();
 
 
-		printer.debug(
+		PRINTER_TRACE(printer,
 					"return existing disassembly info " + json_path
 					);
 
@@ -656,7 +656,7 @@ JsonObject Build::import_disassembly(
 		}
 	}
 
-	printer.debug(
+	PRINTER_TRACE(printer,
 				"open lst file " + lst_path
 				);
 
@@ -703,9 +703,8 @@ JsonObject Build::import_disassembly(
 	ReferenceFile data_file(fs::OpenFlags::read_only());
 	data_file.reference() = contents;
 
-	printer.debug(
-				"parsing disassembly file",
-				lst_path.cstring()
+	PRINTER_TRACE(printer,
+				"parsing disassembly file" + lst_path
 				);
 
 	std::function<String(const Tokenizer& tokenizer)> find_address =
@@ -739,7 +738,7 @@ JsonObject Build::import_disassembly(
 			if( label_tokens.count() == 6 ){
 				//this is a new label
 				if( current_label.is_empty() == false ){
-					printer.debug("add label " + current_label);
+					PRINTER_TRACE(printer, "add label " + current_label);
 
 					//update the size value
 					//append the line count value
@@ -972,7 +971,7 @@ mcu_board_config_t Build::load_mcu_board_config(
 				result_reference
 				);
 
-	printer.debug("Found secret key at address " + String::number(result.secret_key_address,"%08x"));
+	PRINTER_TRACE(printer, "Found secret key at address " + String::number(result.secret_key_address,"%08x"));
 	result.secret_key_address -= (start_address + 1);
 
 	return result;
