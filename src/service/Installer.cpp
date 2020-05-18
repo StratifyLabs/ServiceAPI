@@ -62,6 +62,8 @@ bool Installer::install_id(const InstallerOptions& options){
 	}
 
 	set_project_name( p.get_name() );
+	set_project_id( p.get_document_id() );
+
 	Build b;
 
 	b.set_type( p.get_type() );
@@ -78,7 +80,6 @@ bool Installer::install_id(const InstallerOptions& options){
 		return false;
 	}
 
-	b.set_project_id(p.get_document_id());
 
 	return install_build(b, options);
 }
@@ -89,7 +90,7 @@ bool Installer::install_binary(const InstallerOptions& options){
 	DataFile image(File::Path(options.binary_path()));
 	image.flags() = OpenFlags::read_write();
 
-	if( options.is_binary_application() ){
+	if( options.is_application() ){
 		AppfsInfo source_image_info = Appfs::get_info(options.binary_path());
 
 		if( source_image_info.is_valid() == false ){
@@ -107,19 +108,27 @@ bool Installer::install_binary(const InstallerOptions& options){
 			return false;
 		}
 
+		CLOUD_PRINTER_TRACE("binary image id is " + source_image_info.id());
+
+		set_project_name( source_image_info.name() );
+		set_project_id( source_image_info.id() );
+
 		return install_application_image(
 					image,
 					options
 					);
 	}
 
+	if( options.is_os() ){
+		return install_os_image(
+					image,
+					options
+					);
+	}
 
+	set_error_message("set os or application for the binary type");
+	return false;
 
-
-	return install_os_image(
-				image,
-				options
-				);
 }
 
 bool Installer::install_path(const InstallerOptions& options){
@@ -132,6 +141,22 @@ bool Installer::install_path(const InstallerOptions& options){
 		return false;
 	}
 
+	if( b.decode_build_type() == Build::type_application ){
+		if( options.is_application() == false ){
+			set_error_message("project path is an application but an"
+												"application install was not specified");
+			return false;
+		}
+	}
+
+	if( b.decode_build_type() == Build::type_os ){
+		if( options.is_os() == false ){
+			set_error_message("project path is an os but an"
+												"os install was not specified");
+			return false;
+		}
+	}
+
 	return install_build(b, options);
 }
 
@@ -140,7 +165,7 @@ bool Installer::install_build(
 		const InstallerOptions& options
 		){
 
-	if(build.decode_build_type() == Build::type_application ){
+	if( build.decode_build_type() == Build::type_application ){
 		CLOUD_PRINTER_TRACE("installing application build");
 		return install_application_build(build, options);
 	}
@@ -189,15 +214,9 @@ bool Installer::install_os_build(
 		const InstallerOptions& options
 		){
 
-	if( connection()->is_bootloader() == false ){
-		set_error_message(
-					"cannot install os because bootloader is not connected"
-					);
-		return false;
-	}
-
 	//insert secret key
 	if( options.is_insert_key() ){
+		CLOUD_PRINTER_TRACE("insert secret key");
 		build.insert_secret_key(
 					options.build_name(),
 					var::Data::from_string(options.secret_key())
@@ -206,14 +225,26 @@ bool Installer::install_os_build(
 
 	//append hash
 	if( options.is_append_hash() ){
+		CLOUD_PRINTER_TRACE("append hash");
 		build.append_hash(
 					options.build_name()
 					);
 	}
 
 	DataFile image(OpenFlags::read_only());
+	CLOUD_PRINTER_TRACE(
+				"get build image " +
+				build.normalize_name(options.build_name())
+				);
+
 	image.data() = build.get_image(options.build_name());
 
+	CLOUD_PRINTER_TRACE(
+				"build image size " +
+				String::number(image.data().size())
+				);
+
+	printer().key("build", build.normalize_name(options.build_name()));
 	return install_os_image(
 				image,
 				options
@@ -274,6 +305,7 @@ bool Installer::install_application_image(
 	AppfsFileAttributes attributes;
 	attributes
 			.set_name(project_name() + options.suffix())
+			.set_id( project_id() )
 			.set_startup(options.is_startup())
 			.set_flash(is_flash_available)
 			.set_code_external(options.is_external_code())
@@ -285,24 +317,25 @@ bool Installer::install_application_image(
 			.set_access_mode(options.access_mode())
 			.set_version(version.to_bcd16());
 
-	printer().open_object("appfsAttributes");
-	printer().key("name", attributes.name());
-	printer().key("version", attributes.version());
-	printer().key("id", attributes.id());
-	printer().key("ram", !attributes.is_flash());
-	printer().key("flash", attributes.is_flash());
-	printer().key("startup", attributes.is_startup());
-	printer().key("externalcode", attributes.is_code_external());
-	printer().key("externaldata", attributes.is_data_external());
-	printer().key("tightlycoupledcode", attributes.is_code_tightly_coupled() != 0);
-	printer().key("tightlycoupleddata", attributes.is_data_tightly_coupled() != 0);
-	printer().key("authenticated", attributes.is_authenticated());
-	if( attributes.ram_size() ){
-		printer().key("ramsize", String("<default>"));
-	} else {
-		printer().key("ramsize", String::number(attributes.ram_size()));
+	{
+		PrinterObject po(printer(), "appfsAttributes");
+		printer().key("name", attributes.name());
+		printer().key("version", attributes.version());
+		printer().key("id", attributes.id());
+		printer().key("ram", !attributes.is_flash());
+		printer().key("flash", attributes.is_flash());
+		printer().key("startup", attributes.is_startup());
+		printer().key("externalcode", attributes.is_code_external());
+		printer().key("externaldata", attributes.is_data_external());
+		printer().key("tightlycoupledcode", attributes.is_code_tightly_coupled() != 0);
+		printer().key("tightlycoupleddata", attributes.is_data_tightly_coupled() != 0);
+		printer().key("authenticated", attributes.is_authenticated());
+		if( attributes.ram_size() == 0 ){
+			printer().key("ramsize", String("<default>"));
+		} else {
+			printer().key("ramsize", String::number(attributes.ram_size()));
+		}
 	}
-	printer().close_object();
 
 	if( attributes.apply(image) < 0 ){
 		printer().error("failed to apply file attributes to image");
@@ -343,6 +376,46 @@ bool Installer::install_os_image(
 		const File &image,
 		const InstallerOptions& options){
 	int result;
+	if( connection()->is_bootloader() == false ){
+
+		//bootloader must be invoked
+		CLOUD_PRINTER_TRACE("invoking bootloader");
+		result = connection()->reset_bootloader();
+		if( result < 0 ){
+			set_error_message("Failed to invoke the bootloader");
+			set_troubleshoot_message(
+						"Failed to invoke bootloader with connnection"
+						" error message " +
+						connection()->error_message()
+						);
+
+			return false;
+		}
+
+		CLOUD_PRINTER_TRACE(
+					"waiting " +
+					String::number(options.delay().milliseconds()) +
+					"ms"
+					);
+		options.delay().wait();
+
+		//now reconnect to the device
+		CLOUD_PRINTER_TRACE("reconnect on " + connection()->info().port());
+		CLOUD_PRINTER_TRACE("retry is " + String::number(options.retry_reconnect_count()));
+		if( connection()->reconnect(
+					sys::Link::RetryCount(options.retry_reconnect_count()),
+					sys::Link::RetryDelay(options.delay())
+					) < 0 ){
+			set_error_message("failed to connect to bootloader");
+			set_troubleshoot_message(
+						"Failed to connect to bootloader with connnection"
+						" error message " +
+						connection()->error_message()
+						);
+			return false;
+		}
+	}
+
 	CLOUD_PRINTER_TRACE("Installing OS");
 	Timer transfer_timer;
 	printer().progress_key() = "installing";
@@ -366,6 +439,48 @@ bool Installer::install_os_image(
 		return false;
 	}
 	print_transfer_info(image, transfer_timer);
+
+	if( connection()->reset() < 0 ){
+		printer().error("Failed reset the device.");
+		printer().debug(
+					"Failed to reset the OS with connection error "
+					"message: " +
+					connection()->error_message()
+					);
+		return false;
+	}
+
+	if( options.is_reconnect() ){
+		CLOUD_PRINTER_TRACE(
+					String().format(
+						"reconnect %d retries at %dms intervals",
+						options.retry_reconnect_count(),
+						options.delay().milliseconds()
+						)
+					);
+
+		printer().progress_key() = "reconnecting";
+		for(u32 i=0; i < options.retry_reconnect_count(); i++){
+			if( connection()->reconnect(
+						sys::Link::RetryCount(1),
+						sys::Link::RetryDelay(options.delay())
+						) == 0 ){
+				break;
+			}
+			printer().update_progress(
+						static_cast<int>(i),
+						ProgressCallback::indeterminate_progress_total()
+						);
+		}
+		if( connection()->is_connected() == false ){
+			set_error_message("failed to reconnect: " + connection()->error_message());
+			return false;
+		}
+
+		printer().update_progress(0, 0);
+		printer().progress_key() = "progress";
+	}
+
 	return true;
 }
 

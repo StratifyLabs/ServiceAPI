@@ -79,7 +79,6 @@ int Build::import_from_compiled(
 
 			} else {
 
-
 				if( is_application() ){
 					//make sure settings are populated in the binary
 					CLOUD_PRINTER_TRACE("set application binary properies");
@@ -138,7 +137,10 @@ int Build::import_from_compiled(
 							);
 				file_image.close();
 
-				CLOUD_PRINTER_TRACE("create data copy of image size " + String::number(data_image.size()));
+				CLOUD_PRINTER_TRACE(
+							"create data copy of image size " +
+							String::number(data_image.size())
+							);
 
 				local_build_image_list.push_back(
 							BuildImageInfo()
@@ -246,29 +248,23 @@ int Build::download(const var::String& url){
 var::Data Build::get_image(
 		const var::String& name
 		) const {
+	BuildImageInfo info = build_image_info(name);
+	return info.get_image_data();
+}
 
-	String normal_name = normalize_name(name);
-
-	var::Vector<BuildImageInfo> list = get_build_image_list();
-	u32 pos	= list.find(
-				BuildImageInfo().set_name(normal_name),
-				[](const BuildImageInfo & a, const BuildImageInfo & b){
-		return a.get_name() == b.get_name();
-	}
-	);
-
-	if( pos == list.count() ){
-		return Data();
-	}
-
-	return list.at(pos).get_image_data();
+Build& Build::set_image(
+		const var::String& name,
+		const var::Data& image
+		){
+	BuildImageInfo info = build_image_info(name);
+	info.set_image_data(image);
+	return *this;
 }
 
 Build& Build::insert_secret_key(
 		const var::String& build_name,
 		const var::Reference& secret_key
 		){
-
 
 	BuildImageInfo image_info = build_image_info(
 				normalize_name(build_name)
@@ -347,6 +343,52 @@ Build& Build::append_hash(
 		){
 
 	String normal_name = normalize_name(build_name);
+
+	Sha256 hash;
+
+	if( hash.initialize() < 0 ){
+		printer().error("failed to initialize hash");
+		return *this;
+	}
+
+	BuildImageInfo image_info = build_image_info(build_name);
+	DataFile binary_image(OpenFlags::append_read_write());
+
+	binary_image.data() = image_info.get_image();
+
+	u32 binary_image_size = binary_image.size();
+	CLOUD_PRINTER_TRACE("binary image size is " + String::number(binary_image_size));
+
+	u32 padding = hash.length() - binary_image_size % hash.length();
+
+	var::Data padding_block = Data(padding);
+	padding_block.fill<u8>(0xff);
+
+	binary_image.write(padding_block);
+	//calculate the hash for block
+	CLOUD_PRINTER_TRACE("calculating hash on binary");
+	hash << binary_image.data();
+
+	CLOUD_PRINTER_TRACE(
+				"append hash " +
+				hash.to_string()
+				);
+
+	binary_image.write(hash.output());
+
+	CLOUD_PRINTER_TRACE(
+				String().format(
+					"Total bytes is %d",
+					binary_image.size()
+					));
+
+	binary_image.close();
+
+	printer().key("hash", hash.to_string());
+	printer().key("padding", String::number(padding_block.size()));
+	printer().key("size", String::number(binary_image.size()));
+
+	image_info.set_image(binary_image.data());
 
 	return *this;
 }

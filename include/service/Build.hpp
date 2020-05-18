@@ -37,7 +37,7 @@ public:
 	}
 
 	BuildImageInfo& set_image_data(const var::Reference& image_reference){
-		return set_image( calc::Base64::encode(image_reference));
+		return set_image( calc::Base64::encode(image_reference) );
 	}
 
 };
@@ -175,7 +175,6 @@ public:
 		if( position < list.count() ){
 			return list.at(position);
 		}
-
 		return BuildImageInfo();
 	}
 
@@ -198,6 +197,7 @@ public:
 	int download(const BuildOptions& options);
 
 	var::Data get_image(const var::String& name) const;
+	Build& set_image(const var::String& name, const var::Data& image);
 
 	var::String upload(
 			const BuildOptions& options

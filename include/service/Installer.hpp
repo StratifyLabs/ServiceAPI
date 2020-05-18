@@ -24,7 +24,8 @@ class InstallerOptions {
 
 	//path to an image to install
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,binary_path);
-	API_ACCESS_BOOL(InstallerOptions,binary_application,false);
+	API_ACCESS_BOOL(InstallerOptions,application,false);
+	API_ACCESS_BOOL(InstallerOptions,os,false);
 
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,build_path);
 
@@ -47,6 +48,7 @@ class InstallerOptions {
 	//OS options
 	API_ACCESS_BOOL(InstallerOptions,verify,false);
 	API_ACCESS_BOOL(InstallerOptions,append_hash,false);
+	API_ACCESS_BOOL(InstallerOptions,reconnect,false);
 	API_ACCESS_COMPOUND(InstallerOptions,chrono::MicroTime,delay);
 	API_ACCESS_FUNDAMENTAL(InstallerOptions,u32,retry_reconnect_count,50);
 
@@ -76,6 +78,7 @@ public:
 
 private:
 	API_ACCESS_COMPOUND(Installer,var::String,project_name);
+	API_ACCESS_COMPOUND(Installer,var::String,project_id);
 	API_ACCESS_COMPOUND(Installer,var::String,architecture);
 
 	bool install_url(const InstallerOptions& options);
