@@ -68,7 +68,6 @@ public:
 
 	bool install(const InstallerOptions& options);
 
-	API_ACCESS_COMPOUND(Installer,var::String,troubleshoot_message);
 	API_ACCESS_FUNDAMENTAL(Installer,sys::Link*,connection,nullptr);
 
 	void print_transfer_info(

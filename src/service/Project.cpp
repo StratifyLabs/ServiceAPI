@@ -227,19 +227,19 @@ bool Project::is_build_version_valid(
 	return true;
 }
 
-var::String Project::get_storage_path(const ProjectOptions& options) const {
+var::String Project::get_storage_path(
+		const ProjectOptions& options
+		) const {
 
 	String build_id = get_build_id( options.version() );
-
 	if( build_id.is_empty() ){
 		return String();
 	}
 
 	Build build;
-
 	build.set_type( get_type() );
 	build.set_application_architecture( options.architecture() );
-	String normalized_build_name = build.normalize_name(options.build_name());
+	String normalized_build_name = build.normalize_name( options.build_name() );
 
 	String result;
 	result =

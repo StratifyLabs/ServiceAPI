@@ -33,7 +33,8 @@ public:
 	JSON_ACCESS_INTEGER_WITH_KEY(BuildImageInfo,secretKeySize,secret_key_size);
 
 	var::Data get_image_data() const {
-		return calc::Base64::decode(get_image());
+		return calc::Base64::decode(get_image())
+				.append(var::Data::from_string(get_hash()));
 	}
 
 	BuildImageInfo& set_image_data(const var::Reference& image_reference){
@@ -79,6 +80,7 @@ private:
 	API_ACCESS_COMPOUND(BuildOptions,var::String,architecture);
 	API_ACCESS_COMPOUND(BuildOptions,var::String,url);
 	API_ACCESS_COMPOUND(BuildOptions,var::String,version);
+	API_ACCESS_COMPOUND(BuildOptions,var::String,storage_path);
 
 };
 
@@ -131,7 +133,7 @@ public:
 	JSON_ACCESS_STRING(Build,description);
 	JSON_ACCESS_STRING(Build,type);
 	JSON_ACCESS_STRING(Build,permissions);
-	JSON_ACCESS_STRING(Build,project_id);
+	JSON_ACCESS_STRING_WITH_KEY(Build,projectId,project_id);
 	JSON_ACCESS_ARRAY_WITH_KEY(Build,BuildImageInfo,buildList,build_image_list);
 	JSON_ACCESS_STRING_WITH_KEY(Build,ramSize,ram_size);
 	JSON_ACCESS_BOOL_WITH_KEY(Build,isBuildImage,image_included);
@@ -142,6 +144,18 @@ public:
 			image_info.set_image("<base64>");
 		}
 		set_image_included(false);
+		return *this;
+	}
+
+	Build& remove_other_build_images(const var::String& keep_name){
+		var::Vector<BuildImageInfo> build_list = build_image_list();
+		var::Vector<BuildImageInfo> updated_build_list;
+		for(BuildImageInfo& image_info: build_list){
+			if( image_info.get_name() == normalize_name(keep_name) ){
+				updated_build_list.push_back(image_info);
+			}
+		}
+		set_build_image_list(updated_build_list);
 		return *this;
 	}
 
@@ -162,7 +176,7 @@ public:
 
 	BuildImageInfo build_image_info(
 			const var::String& build_name
-			){
+			) const {
 		var::Vector<BuildImageInfo> list = build_image_list();
 		u32 position = list.find(
 					BuildImageInfo().set_name(
@@ -199,6 +213,8 @@ public:
 	var::Data get_image(const var::String& name) const;
 	Build& set_image(const var::String& name, const var::Data& image);
 
+	var::String normalize_name(const var::String & build_name) const;
+
 	var::String upload(
 			const BuildOptions& options
 			);
@@ -229,7 +245,6 @@ public:
 			sys::Printer& printer = null_printer()
 			);
 
-	var::String normalize_name(const var::String & build_name) const;
 
 	int decode_build_type() const;
 

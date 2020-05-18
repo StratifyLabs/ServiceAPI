@@ -61,24 +61,51 @@ bool Installer::install_id(const InstallerOptions& options){
 		return false;
 	}
 
+	CLOUD_PRINTER_TRACE("setting project name " + p.get_name());
 	set_project_name( p.get_name() );
+	CLOUD_PRINTER_TRACE("setting project id " + p.get_document_id());
 	set_project_id( p.get_document_id() );
 
 	Build b;
 
+	CLOUD_PRINTER_TRACE("setting build type " + p.get_type());
 	b.set_type( p.get_type() );
 	b.set_application_architecture(
 				connection()->sys_info().arch()
 				);
 
+	CLOUD_PRINTER_TRACE("setting architecture " + b.application_architecture());
+
+
+	String cloud_storage_path =
+			p.get_storage_path(
+				ProjectOptions()
+				.set_version( options.version() )
+				.set_build_name( options.build_name() )
+				.set_architecture( b.application_architecture() )
+				);
+	CLOUD_PRINTER_TRACE("getting cloud storage " + cloud_storage_path);
+
+	String build_document_id =
+			p.get_build_id(options.version());
+
+	CLOUD_PRINTER_TRACE("build id is " + build_document_id);
+
 	//download the build
 	if( b.download(
 				BuildOptions(p.get_document_id())
+				.set_document_id(build_document_id)
 				.set_build_name(
-					b.normalize_name(options.build_name()))
+					b.normalize_name(options.build_name())
+					)
+				.set_storage_path(cloud_storage_path)
 				) < 0 ){
+		CLOUD_PRINTER_TRACE("failed to download the build image");
+		set_error_message(b.error_message());
 		return false;
 	}
+
+	//now download the actual binary image
 
 
 	return install_build(b, options);
@@ -86,6 +113,12 @@ bool Installer::install_id(const InstallerOptions& options){
 
 
 bool Installer::install_binary(const InstallerOptions& options){
+
+	if( FileInfo::suffix(options.binary_path()) == "json" ){
+		Build b = Build().load(options.binary_path());
+		set_project_name(b.get_name());
+		return install_build(b,options);
+	}
 
 	DataFile image(File::Path(options.binary_path()));
 	image.flags() = OpenFlags::read_write();
@@ -95,11 +128,6 @@ bool Installer::install_binary(const InstallerOptions& options){
 
 		if( source_image_info.is_valid() == false ){
 			set_error_message(
-						options.binary_path() +
-						" is not a valid application binary file"
-						);
-
-			set_troubleshoot_message(
 						"The `path` was specified as a file. However, "
 						"the file specified did not contain a valid "
 						"Stratify OS application binary. The application "
@@ -203,9 +231,12 @@ bool Installer::install_application_build(
 		return false;
 	}
 
+	printer().key("build", build.normalize_name(options.build_name()));
+	printer().key("version", build.get_version());
 	return install_application_image(
 				image,
-				options
+				InstallerOptions(options)
+				.set_version(build.get_version())
 				);
 }
 
@@ -221,6 +252,18 @@ bool Installer::install_os_build(
 					options.build_name(),
 					var::Data::from_string(options.secret_key())
 					);
+
+		String secret_key =
+				build.build_image_info(options.build_name()).get_secret_key();
+		PrinterObject po(printer(), "secretKey");
+		printer().key("key256", secret_key);
+		printer().key(
+					"key128",
+					secret_key.create_sub_string(
+						String::Position(0),
+						String::Length(secret_key.length()/2)
+						)
+					);
 	}
 
 	//append hash
@@ -229,6 +272,32 @@ bool Installer::install_os_build(
 		build.append_hash(
 					options.build_name()
 					);
+	}
+
+	if( FileInfo::suffix(options.destination()) == "json" ){
+		CLOUD_PRINTER_TRACE("save build as json" + options.destination());
+		LinkPath link_path(options.destination(), connection()->driver());
+
+		build.remove_other_build_images(options.build_name());
+
+		if( link_path.is_host_path() ){
+			int result = build.save(
+						link_path.path()
+						);
+
+			if( result < 0 ){
+				set_error_message( build.error_message() );
+				return false;
+			}
+
+			printer().key("destination", link_path.path_description());
+			return true;
+		} else {
+			set_error_message(
+						"cannot save JSON export to device (use `host@` prefix)"
+						);
+			return false;
+		}
 	}
 
 	DataFile image(OpenFlags::read_only());
@@ -244,7 +313,17 @@ bool Installer::install_os_build(
 				String::number(image.data().size())
 				);
 
+	if( image.data().size() == 0 ){
+		set_error_message(
+					"build `" + build.normalize_name(options.build_name()) +
+					"` does not exist for " + project_name()
+					);
+		return false;
+	}
+
+
 	printer().key("build", build.normalize_name(options.build_name()));
+	printer().key("version", build.get_version());
 	return install_os_image(
 				image,
 				options
@@ -274,7 +353,7 @@ bool Installer::install_application_image(
 			set_error_message(
 						project_name() +" is currently running"
 						);
-			set_troubleshoot_message(
+			set_error_message(
 						"`sl` cannot install an application "
 						"if the application is currently executing. "
 						"If you specifiy `kill=true` when installing, "
@@ -320,7 +399,7 @@ bool Installer::install_application_image(
 	{
 		PrinterObject po(printer(), "appfsAttributes");
 		printer().key("name", attributes.name());
-		printer().key("version", attributes.version());
+		printer().key("version", version.string());
 		printer().key("id", attributes.id());
 		printer().key("ram", !attributes.is_flash());
 		printer().key("flash", attributes.is_flash());
@@ -338,7 +417,7 @@ bool Installer::install_application_image(
 	}
 
 	if( attributes.apply(image) < 0 ){
-		printer().error("failed to apply file attributes to image");
+		set_error_message("failed to apply file attributes to image");
 		return -1;
 	}
 
@@ -349,12 +428,17 @@ bool Installer::install_application_image(
 		return false;
 	}
 
+	String destination =
+			options.destination().is_empty() ?
+				String("/app") :
+				options.destination();
+
 	Timer transfer_timer;
 	printer().progress_key() = "installing";
 	transfer_timer.start();
 	int result = connection()->install_app(
 				image,
-				fs::File::Path(options.destination()),
+				fs::File::Path(destination),
 				sys::Link::ApplicationName(attributes.name()),
 				printer().progress_callback()
 				);
@@ -376,14 +460,54 @@ bool Installer::install_os_image(
 		const File &image,
 		const InstallerOptions& options){
 	int result;
-	if( connection()->is_bootloader() == false ){
+
+	if( !options.destination().is_empty() ){
+		CLOUD_PRINTER_TRACE("saving image to " + options.destination());
+		String destination;
+		LinkPath link_path(options.destination(), connection()->driver());
+		if( link_path.is_host_path() ){
+			if( link_path.path().is_empty() ){
+				destination =
+						project_name() +
+						"/" +
+						Build().normalize_name(options.build_name()) +
+						"/" +
+						project_name() +
+						".bin";
+			} else {
+				destination = link_path.path();
+			}
+
+			File destination_file;
+			if( destination_file.create(
+						destination,
+						File::IsOverwrite(true)) < 0 ){
+				set_error_message("failed to create destination"
+													"file " + destination);
+				return false;
+			}
+
+			destination_file.write(image);
+			printer().key("destination", "host@" + destination);
+			return true;
+		} else {
+			set_error_message(
+						"cannot write the os directly to the"
+						"device filesystem at " + link_path.path_description()
+						);
+			return false;
+		}
+	}
+
+
+	if( !connection()->is_bootloader() ){
 
 		//bootloader must be invoked
 		CLOUD_PRINTER_TRACE("invoking bootloader");
 		result = connection()->reset_bootloader();
 		if( result < 0 ){
 			set_error_message("Failed to invoke the bootloader");
-			set_troubleshoot_message(
+			set_error_message(
 						"Failed to invoke bootloader with connnection"
 						" error message " +
 						connection()->error_message()
@@ -407,7 +531,7 @@ bool Installer::install_os_image(
 					sys::Link::RetryDelay(options.delay())
 					) < 0 ){
 			set_error_message("failed to connect to bootloader");
-			set_troubleshoot_message(
+			set_error_message(
 						"Failed to connect to bootloader with connnection"
 						" error message " +
 						connection()->error_message()
@@ -441,8 +565,7 @@ bool Installer::install_os_image(
 	print_transfer_info(image, transfer_timer);
 
 	if( connection()->reset() < 0 ){
-		printer().error("Failed reset the device.");
-		printer().debug(
+		set_error_message(
 					"Failed to reset the OS with connection error "
 					"message: " +
 					connection()->error_message()

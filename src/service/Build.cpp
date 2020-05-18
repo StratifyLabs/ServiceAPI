@@ -166,16 +166,40 @@ int Build::import_from_compiled(
 
 int Build::download(const BuildOptions& options){
 
-	if( Document::download(
-				options
-				) < 0 ){
+	if( Document::download(options) < 0 ){
+		set_error_message(
+					"failed to download the document " +
+					options.document_id()
+					);
 		return -1;
 	}
 
 	//download the build images
+	if( !options.build_name().is_empty() ){
+		BuildImageInfo image_info =
+				build_image_info(options.build_name());
 
+		DataFile image(OpenFlags::append_write_only());
 
+		CLOUD_PRINTER_TRACE(
+					"downloading build from storage path " +
+					options.storage_path()
+					);
 
+		if( cloud().get_storage_object(
+					options.storage_path(),
+					image
+					) < 0 ){
+			printer().error(
+						"Failed to download binary from " +
+						options.storage_path()
+						);
+			return -1;
+		}
+
+		image_info.set_image_data(image.data());
+
+	}
 	return 0;
 }
 
@@ -206,8 +230,8 @@ int Build::download(const var::String& url){
 	String response_string(response.data());
 
 	CLOUD_PRINTER_TRACE(String().format(
-																"received %d bytes from server", response.data().size()
-																));
+												"received %d bytes from server", response.data().size()
+												));
 
 	if( http_client.status_code() != 200 ){
 		printer().debug("http response '%s'", response_string.cstring());
@@ -334,6 +358,7 @@ Build& Build::insert_secret_key(
 		return *this;
 	}
 
+	image_info.set_secret_key(secret_key_reference.to_string());
 	image_info.set_image_data(image_file.data());
 	return *this;
 }
@@ -341,8 +366,6 @@ Build& Build::insert_secret_key(
 Build& Build::append_hash(
 		const var::String& build_name
 		){
-
-	String normal_name = normalize_name(build_name);
 
 	Sha256 hash;
 
@@ -352,29 +375,33 @@ Build& Build::append_hash(
 	}
 
 	BuildImageInfo image_info = build_image_info(build_name);
-	DataFile binary_image(OpenFlags::append_read_write());
 
-	binary_image.data() = image_info.get_image();
+	DataFile binary_image(OpenFlags::append_read_write());
+	binary_image.data() = image_info.get_image_data();
 
 	u32 binary_image_size = binary_image.size();
 	CLOUD_PRINTER_TRACE("binary image size is " + String::number(binary_image_size));
 
-	u32 padding = hash.length() - binary_image_size % hash.length();
+	u32 padding_length = hash.length() - binary_image_size % hash.length();
+	if( padding_length == hash.length() ){
+		padding_length = 0;
+	}
 
-	var::Data padding_block = Data(padding);
-	padding_block.fill<u8>(0xff);
-
-	binary_image.write(padding_block);
+	if( padding_length > 0 ){
+		var::Data padding_block = Data(padding_length);
+		padding_block.fill<u8>(0xff);
+		binary_image.write(padding_block);
+	}
 	//calculate the hash for block
 	CLOUD_PRINTER_TRACE("calculating hash on binary");
 	hash << binary_image.data();
 
 	CLOUD_PRINTER_TRACE(
-				"append hash " +
+				"hash " +
 				hash.to_string()
 				);
 
-	binary_image.write(hash.output());
+	//binary_image.write(hash.output());
 
 	CLOUD_PRINTER_TRACE(
 				String().format(
@@ -385,10 +412,14 @@ Build& Build::append_hash(
 	binary_image.close();
 
 	printer().key("hash", hash.to_string());
-	printer().key("padding", String::number(padding_block.size()));
+	printer().key("padding", String::number(padding_length));
 	printer().key("size", String::number(binary_image.size()));
 
-	image_info.set_image(binary_image.data());
+	image_info.set_hash(hash.to_string());
+	image_info.set_padding(padding_length);
+	if( padding_length > 0 ){
+		image_info.set_image_data(binary_image.data());
+	}
 
 	return *this;
 }
