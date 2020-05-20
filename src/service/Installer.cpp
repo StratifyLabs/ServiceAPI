@@ -740,11 +740,14 @@ int Installer::save_image_locally(
 		String destination;
 		LinkPath link_path(options.destination(), connection()->driver());
 
-
-
 		if( link_path.is_host_path() ){
-			if( link_path.path().is_empty() ){
+
+			FileInfo info = File::get_info(link_path.path());
+
+			if( link_path.path().is_empty() || info.is_directory() ){
+				//if directory do <dir>/<project>_<build_name> with .bin for os images
 				destination =
+						link_path.path().is_empty() ? String() : (link_path.path() + "/") +
 						project_name() +
 						"_" +
 						Build()
