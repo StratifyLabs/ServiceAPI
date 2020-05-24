@@ -3,6 +3,7 @@
 #include <sapi/var.hpp>
 #include <sapi/chrono.hpp>
 
+#include "service/Thing.hpp"
 #include "service/Installer.hpp"
 
 using namespace service;
@@ -134,8 +135,6 @@ bool Installer::install_id(const InstallerOptions& options){
 	}
 
 	//now download the actual binary image
-
-
 	return install_build(b, options);
 }
 
@@ -177,6 +176,7 @@ bool Installer::install_binary(const InstallerOptions& options){
 
 	if( options.is_os() ){
 		return install_os_image(
+					Build(),
 					image,
 					options
 					);
@@ -323,6 +323,7 @@ bool Installer::update_os(const InstallerOptions& options){
 					.set_application(false)
 					.set_project_id( os_project.get_document_id() )
 					.set_team_id( os_project.get_team_id() )
+					.set_synchronize_thing()
 					);
 	} else {
 		printer().key("currentVersion", current_version.string());
@@ -390,10 +391,52 @@ bool Installer::install_os_build(
 
 	//insert secret key
 	if( options.is_insert_key() ){
+
+		/*
+		 * Options for the key in preferential order
+		 *
+		 * 1. If a key is provided, use it
+		 * 2. if synchronize_thing() and is NOT rekey() and team is not empty -- use the thing key
+		 * 3. Generate a new key
+		 *
+		 * 2 and 3 and handled as part of Build::insert_secret_key()
+		 *
+		 *
+		 */
+
+		String existing_secret_key = options.secret_key();
+
+		String thing_team = connection()->sys_info().team_id();
+		if( thing_team.is_empty() ){
+			thing_team = options.team_id();
+		}
+
+		if( !thing_team.is_empty() && options.secret_key().is_empty() && !options.is_rekey_thing() ){
+			Thing thing;
+			String thing_id = connection()->sys_info().serial_number().to_string();
+
+			CLOUD_PRINTER_TRACE("trying to download thing: " + thing_team + "/" + thing_id);
+			if( thing.download(
+						ThingOptions()
+						.set_document_id(thing_id)
+						.set_team_id(thing_team)
+						) >= 0 ){
+				CLOUD_PRINTER_TRACE("Got secret key from thing");
+				existing_secret_key = thing.get_secret_key();
+			} else {
+				set_error_message(
+							"Failed to download the key for this thing. "
+							"You may not have permission to access it. "
+							"Or thing thing does not yet exist. If this is the case use the `rekey` option with `sync` to create it. "
+							);
+				return false;
+			}
+		}
+
 		CLOUD_PRINTER_TRACE("insert secret key");
 		build.insert_secret_key(
 					options.build_name(),
-					var::Data::from_string(options.secret_key())
+					var::Data::from_string(existing_secret_key)
 					);
 
 		String secret_key =
@@ -407,6 +450,7 @@ bool Installer::install_os_build(
 						String::Length(secret_key.length()/2)
 						)
 					);
+
 	}
 
 	//append hash
@@ -467,10 +511,29 @@ bool Installer::install_os_build(
 
 	printer().key("build", build.normalize_name(options.build_name()));
 	printer().key("version", build.get_version());
-	return install_os_image(
+	bool result = install_os_image(
+				build,
 				image,
-				options
+				InstallerOptions(options)
+				.set_reconnect( options.is_reconnect() || options.is_synchronize_thing() )
 				);
+
+	if( result && options.is_synchronize_thing() ){
+		//update the thing with the new version that is installed
+		PrinterObject po(printer(), "thing");
+
+		Thing thing(connection()->sys_info());
+		thing.set_secret_key(
+					build.build_image_info(options.build_name()).get_secret_key()
+					);
+		printer() << thing;
+
+		if( thing.upload() < 0 ){
+			printer().warning("failed to synchronize thing");
+		}
+	}
+
+	return result;
 }
 
 bool Installer::install_application_image(
@@ -482,6 +545,7 @@ bool Installer::install_application_image(
 		int result;
 
 		result = save_image_locally(
+					Build(),
 					image,
 					InstallerOptions(options)
 					.set_application()
@@ -613,12 +677,13 @@ bool Installer::install_application_image(
 }
 
 bool Installer::install_os_image(
+		const Build& build,
 		const File &image,
 		const InstallerOptions& options){
 	int result;
 
-
 	result = save_image_locally(
+				build,
 				image,
 				InstallerOptions(options)
 				.set_os()
@@ -732,6 +797,7 @@ bool Installer::reconnect(const InstallerOptions& options){
 }
 
 int Installer::save_image_locally(
+		const Build& build,
 		const fs::File& image,
 		const InstallerOptions& options
 		){
@@ -747,31 +813,49 @@ int Installer::save_image_locally(
 			if( link_path.path().is_empty() || info.is_directory() ){
 				//if directory do <dir>/<project>_<build_name> with .bin for os images
 				destination =
-						link_path.path().is_empty() ? String() : (link_path.path() + "/") +
-						project_name() +
-						"_" +
-						Build()
-						.set_type( options.is_os() ? Build::os_type() : Build::application_type() )
-						.set_application_architecture( architecture() )
-						.normalize_name(options.build_name()) +
-						(options.is_os() ?
-							 ".bin" :
-							 "");
+						(link_path.path().is_empty() ?
+							String() :
+							(link_path.path() + "/")) +
+							project_name() +
+							"_" +
+							Build()
+							.set_type( options.is_os() ? Build::os_type() : Build::application_type() )
+							.set_application_architecture( architecture() )
+							.normalize_name(options.build_name()) +
+							(options.is_os() ?
+								 ".bin" :
+								 "");
+
 			} else {
 				destination = link_path.path();
 			}
 
-			File destination_file;
-			if( destination_file.create(
+			if( image.save_copy(
 						destination,
-						File::IsOverwrite(true)) < 0 ){
+						File::IsOverwrite(true)
+						) < 0 ){
 				set_error_message("failed to create destination"
 													"file " + destination);
 				return 0;
 			}
+			printer().key("image", "host@" + destination);
 
-			destination_file.write(image);
-			printer().key("destination", "host@" + destination);
+			JsonKeyValueList<BuildSectionImageInfo> section_image_info =
+					build.build_image_info( options.build_name() ).get_section_list();
+
+			for(const BuildSectionImageInfo& image_info: section_image_info){
+				String section_destination = FileInfo::no_suffix(destination);
+				section_destination += "." + image_info.key() + ".bin";
+				printer().key(image_info.key(), "host@" + section_destination);
+
+				if( image_info.get_image_data().save(
+							section_destination,
+							Reference::IsOverwrite(true)
+							) < 0 ){
+					printer().warning("failed to save section binary " + section_destination);
+				}
+			}
+
 			return 1;
 		} else {
 			if( options.is_os() ){

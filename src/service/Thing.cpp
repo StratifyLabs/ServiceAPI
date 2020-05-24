@@ -18,18 +18,15 @@ Thing::Thing(const sys::SysInfo & info){
 				);
 }
 
-var::String Thing::upload(
-		IsCreate is_create
-		){
+var::String Thing::upload(){
 
 	ThingOptions options;
 
 	String id;
 
-
 	id = get_system_information().get_serial_number();
 
-	if( (id == "<invalid>") || (id.is_empty()) ){
+	if( id.is_empty() ){
 		CLOUD_PRINTER_TRACE("no id available for thing");
 		return String();
 	}
@@ -41,12 +38,6 @@ var::String Thing::upload(
 				id
 				);
 
-	if( options.is_create() ){
-		CLOUD_PRINTER_TRACE("create thing");
-	} else {
-		CLOUD_PRINTER_TRACE("update thing");
-	}
-
 	if( get_team_id().is_empty() ){
 		CLOUD_PRINTER_TRACE("upload to public things");
 	} else {
@@ -56,9 +47,20 @@ var::String Thing::upload(
 					);
 	}
 
+
+	bool is_create = Thing().download(
+				ThingOptions()
+				.set_document_id(id)
+				.set_team_id(get_team_id())
+				) < 0;
+
+	CLOUD_PRINTER_TRACE("Thing needs to be created? " + String::number(is_create));
+
 	return Document::upload(
 				ThingOptions()
-
+				.set_document_id(id)
+				.set_team_id(get_team_id())
+				.set_create(is_create)
 				);
 }
 

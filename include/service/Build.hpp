@@ -3,6 +3,7 @@
 
 #include <sapi/sys/Link.hpp>
 #include <sapi/calc/Base64.hpp>
+#include <sapi/crypto/Sha256.hpp>
 #include <CloudAPI/cloud/Document.hpp>
 
 namespace service {
@@ -19,10 +20,82 @@ private:
 	API_ACCESS_FUNDAMENTAL(BuildSecretKeyInfo,u32,size,0);
 };
 
+class BuildHashInfo {
+	API_ACCESS_COMPOUND(BuildHashInfo,var::String,value);
+	API_ACCESS_FUNDAMENTAL(BuildHashInfo,u32,size,0);
+	API_ACCESS_FUNDAMENTAL(BuildHashInfo,u32,padding,0);
+
+public:
+
+	static BuildHashInfo calculate(var::Data& image){
+		crypto::Sha256 hash;
+
+		if( hash.initialize() < 0 ){
+			return BuildHashInfo();
+		}
+
+		u32 image_size = image.size();
+
+		u32 padding_length = hash.length() - image_size % hash.length();
+		if( padding_length == hash.length() ){
+			padding_length = 0;
+		}
+
+		if( padding_length > 0 ){
+			var::Data padding_block = var::Data(padding_length);
+			padding_block.fill<u8>(0xff);
+			image.append(padding_block);
+		}
+		//calculate the hash for block
+		hash.start();
+		hash << image;
+		hash.finish();
+
+		return BuildHashInfo()
+				.set_value(hash.to_string())
+				.set_padding(padding_length)
+				.set_size(image.size());
+	}
+};
+
+class BuildSectionImageInfo : public var::JsonKeyValue {
+public:
+	BuildSectionImageInfo(const var::String& key) :
+		JsonKeyValue(key, var::JsonObject()){
+	}
+
+	BuildSectionImageInfo(const var::String& key, const var::JsonObject& object) :
+		JsonKeyValue(key, object){
+	}
+
+	JSON_ACCESS_STRING(BuildSectionImageInfo,image);
+	JSON_ACCESS_STRING(BuildSectionImageInfo,hash);
+	JSON_ACCESS_INTEGER(BuildSectionImageInfo,padding);
+
+	var::Data get_image_data() const {
+		return calc::Base64::decode(get_image())
+				.append(var::Data::from_string(get_hash()));
+	}
+
+	BuildSectionImageInfo& set_image_data(const var::Reference& image_reference){
+		return set_image( calc::Base64::encode(image_reference) );
+	}
+
+	BuildSectionImageInfo& calculate_hash(){
+		var::Data image = get_image_data();
+		BuildHashInfo hash_info = BuildHashInfo::calculate(image);
+		set_hash(hash_info.value());
+		set_padding(hash_info.padding());
+		if( hash_info.padding() ){
+			set_image_data(image);
+		}
+		return *this;
+	}
+};
+
 class BuildImageInfo : public var::JsonValue {
 public:
-	BuildImageInfo() : var::JsonValue( var::JsonObject() ){}
-	BuildImageInfo(const var::JsonObject& object) : var::JsonValue(object){}
+	JSON_ACCESS_CONSTRUCT_OBJECT(BuildImageInfo);
 
 	JSON_ACCESS_STRING(BuildImageInfo,name);
 	JSON_ACCESS_STRING(BuildImageInfo,image);
@@ -31,6 +104,7 @@ public:
 	JSON_ACCESS_STRING_WITH_KEY(BuildImageInfo,secretKey,secret_key);
 	JSON_ACCESS_INTEGER_WITH_KEY(BuildImageInfo,secretKeyPosition,secret_key_position);
 	JSON_ACCESS_INTEGER_WITH_KEY(BuildImageInfo,secretKeySize,secret_key_size);
+	JSON_ACCESS_OBJECT_LIST_WITH_KEY(BuildImageInfo,BuildSectionImageInfo,sections,section_list);
 
 	var::Data get_image_data() const {
 		return calc::Base64::decode(get_image())
@@ -39,6 +113,17 @@ public:
 
 	BuildImageInfo& set_image_data(const var::Reference& image_reference){
 		return set_image( calc::Base64::encode(image_reference) );
+	}
+
+	BuildImageInfo& calculate_hash(){
+		var::Data image = get_image_data();
+		BuildHashInfo hash_info = BuildHashInfo::calculate(image);
+		set_hash(hash_info.value());
+		set_padding(hash_info.padding());
+		if( hash_info.padding() ){
+			set_image_data(image);
+		}
+		return *this;
 	}
 
 };
@@ -259,11 +344,24 @@ public:
 private:
 	API_READ_ACCESS_COMPOUND(Build,var::String,application_architecture);
 
-	var::String build_file_path(
+	class SectionPathInfo {
+		API_ACCESS_COMPOUND(SectionPathInfo,var::String,name);
+		API_ACCESS_COMPOUND(SectionPathInfo,var::String,path);
+	};
+
+
+	var::String get_build_file_path(
 			const var::String & path,
 			const var::String & build
 			);
 
+	var::Vector<SectionPathInfo> get_section_image_path_list(
+			const var::String & path,
+			const var::String & build
+			);
+
+
+	var::String calculate_hash(var::Data& image);
 	void migrate_build_info_list_20200518();
 
 

@@ -22,7 +22,7 @@ class ThingSystemInformation : public var::JsonValue {
 public:
 	JSON_ACCESS_CONSTRUCT_OBJECT(ThingSystemInformation);
 
-	ThingSystemInformation(const sys::SysInfo & info){
+	ThingSystemInformation(const sys::SysInfo & info) : JsonValue(var::JsonObject()){
 		set_application_signature(var::String::number(info.application_signature(), "0x%08X"));
 		set_architecture(info.cpu_architecture());
 		set_bsp_git_hash(info.bsp_git_hash());
@@ -68,12 +68,6 @@ public:
 	JSON_ACCESS_STRING(Thing,permissions);
 	JSON_ACCESS_OBJECT_WITH_KEY(Thing,ThingSystemInformation,systemInformation,system_information);
 
-	Thing & set_secret_key(
-			const var::Reference & secret_key
-			){
-		set_secret_key(secret_key.to_string());
-		return *this;
-	}
 
 	int download(const ThingOptions& options){
 		return Document::download(options);
@@ -87,15 +81,8 @@ public:
 					);
 	}
 
-	var::String upload(
-			IsCreate is_create
-			);
+	var::String upload();
 
-	var::String update(){
-		return upload(
-					IsCreate(false)
-					);
-	}
 
 private:
 

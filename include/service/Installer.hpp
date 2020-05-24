@@ -63,6 +63,11 @@ class InstallerOptions {
 	API_ACCESS_BOOL(InstallerOptions,insert_key,false);
 	API_ACCESS_COMPOUND(InstallerOptions,var::String,secret_key);
 
+	//thing options
+	API_ACCESS_BOOL(InstallerOptions,synchronize_thing,false); //keep thing synchronized to actions
+	API_ACCESS_BOOL(InstallerOptions,rekey_thing,false); //only valid if team is not empty
+
+
 public:
 	InstallerOptions(){
 		set_delay( chrono::Milliseconds(500) );
@@ -130,6 +135,7 @@ private:
 			);
 
 	bool install_os_image(
+			const Build& build,
 			const fs::File& image,
 			const InstallerOptions& options
 			);
@@ -140,6 +146,7 @@ private:
 			);
 
 	int save_image_locally(
+			const Build& build,
 			const fs::File& image,
 			const InstallerOptions& options
 			);
