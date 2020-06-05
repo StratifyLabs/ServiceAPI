@@ -197,6 +197,8 @@ bool Installer::install_path(const InstallerOptions& options){
 		return false;
 	}
 
+	set_project_id( b.get_project_id() );
+
 	if( b.decode_build_type() == Build::type_application ){
 		if( options.is_application() == false ){
 			set_error_message("project path is an application but an"
