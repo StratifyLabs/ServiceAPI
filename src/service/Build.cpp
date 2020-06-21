@@ -15,17 +15,18 @@ using namespace service;
 Build::Build(){}
 
 int Build::import_from_compiled(
-		const var::String& path
+		const BuildImportOptions & options
 		){
 
-	CLOUD_PRINTER_TRACE("load project settings from " + path);
+	CLOUD_PRINTER_TRACE("load project settings from " + options.path());
+	CLOUD_PRINTER_TRACE("Importing with build application arch set to " + application_architecture());
 	Project project_settings =
-			Project().load(path + "/" + Project::file_name());
+			Project().load(options.path() + "/" + Project::file_name());
 
 	if( project_settings.is_valid() == false ){
 		printer().error(
 					"Failed to open project settings at %s",
-					path.cstring()
+					options.path().cstring()
 					);
 		return -1;
 	}
@@ -42,10 +43,12 @@ int Build::import_from_compiled(
 		set_permissions("public");
 	}
 
+	set_application_architecture( options.application_architecture() );
+
 	set_ram_size( project_settings.get_ram_size() );
 	set_image_included(true);
 
-	StringList build_directory_list = Dir::read_list(path);
+	StringList build_directory_list = Dir::read_list(options.path());
 	CLOUD_PRINTER_TRACE(
 				"check " +
 				String::number(build_directory_list.count()) +
@@ -57,131 +60,137 @@ int Build::import_from_compiled(
 		if( (build_directory_entry.find("build_") == 0) &&
 				(build_directory_entry.find("_link") == String::npos) ){
 
-			String file_path = get_build_file_path(
-						path,
-						build_directory_entry
-						);
+			if( options.build().is_empty()
+					|| Build::normalize_name(build_directory_entry) == Build::normalize_name(options.build()) ){
 
-			CLOUD_PRINTER_TRACE("import file path " + file_path);
-
-			//import the binary data
-			DataFile data_image(fs::OpenFlags::append_write_only());
-			File file_image;
-			if( file_image.open(
-						file_path,
-						fs::OpenFlags::read_only()
-						) < 0 ){
-				printer().error(
-							"failed to open build image at %s",
-							file_path.cstring()
-							);
-				return -1;
-
-			}
-
-			mcu_board_config_t mcu_board_config = {0};
-			JsonKeyValueList<BuildSectionImageInfo> section_list;
-
-			if( is_application() ){
-				//make sure settings are populated in the binary
-				CLOUD_PRINTER_TRACE("set application binary properies");
-
-				AppfsFileAttributes appfs_file_attributes;
-				appfs_file_attributes.set_name(
-							project_settings.get_name()
-							);
-				appfs_file_attributes.set_id(
-							project_settings.get_document_id()
-							);
-				appfs_file_attributes.set_startup(false);
-				appfs_file_attributes.set_flash(false);
-				appfs_file_attributes.set_ram_size(0);
-
-				VersionString version;
-				version.string() = project_settings.get_version();
-				appfs_file_attributes.set_version(version.to_bcd16());
-
-				appfs_file_t header;
-				Reference header_data_reference(header);
-				file_image.read(
-							header_data_reference
-							);
-				appfs_file_attributes.apply(&header);
-
-				data_image.write(
-							header_data_reference
-							);
-			} else if( is_os() ){
-				mcu_board_config	=
-						load_mcu_board_config(
-							fs::File::Path(path),
-							project_settings.get_name(),
-							Build::Name(build_directory_entry),
-							printer()
-							);
-
-				Vector<SectionPathInfo> section_path_list = get_section_image_path_list(
-							path,
+				String file_path = get_build_file_path(
+							options.path(),
 							build_directory_entry
 							);
 
-				CLOUD_PRINTER_TRACE(
-							"build section count is " +
-							String::number(section_path_list.count())
-							);
+				CLOUD_PRINTER_TRACE("import file path " + file_path);
 
-				for(const SectionPathInfo& section: section_path_list){
-					DataFile section_image = DataFile(
-								File::Path(section.path())
+				//import the binary data
+				DataFile data_image(fs::OpenFlags::append_write_only());
+				File file_image;
+				if( file_image.open(
+							file_path,
+							fs::OpenFlags::read_only()
+							) < 0 ){
+					printer().error(
+								"failed to open build image at %s",
+								file_path.cstring()
+								);
+					return -1;
+
+				}
+
+				mcu_board_config_t mcu_board_config = {0};
+				JsonKeyValueList<BuildSectionImageInfo> section_list;
+
+				if( is_application() ){
+					//make sure settings are populated in the binary
+					CLOUD_PRINTER_TRACE("set application binary properties");
+
+					AppfsFileAttributes appfs_file_attributes;
+					appfs_file_attributes.set_name(
+								project_settings.get_name()
+								);
+					appfs_file_attributes.set_id(
+								project_settings.get_document_id()
+								);
+					appfs_file_attributes.set_startup(false);
+					appfs_file_attributes.set_flash(false);
+					appfs_file_attributes.set_ram_size(0);
+
+					VersionString version;
+					version.string() = project_settings.get_version();
+					appfs_file_attributes.set_version(version.to_bcd16());
+
+					appfs_file_t header;
+					Reference header_data_reference(header);
+					file_image.read(
+								header_data_reference
+								);
+					appfs_file_attributes.apply(&header);
+
+					data_image.write(
+								header_data_reference
+								);
+				} else if( is_os() ){
+
+					mcu_board_config	=
+							load_mcu_board_config(
+								fs::File::Path(options.path()),
+								project_settings.get_name(),
+								Build::Name(build_directory_entry),
+								printer()
 								);
 
-					CLOUD_PRINTER_TRACE("Adding section " + section.name());
+					Vector<SectionPathInfo> section_path_list = get_section_image_path_list(
+								options.path(),
+								build_directory_entry
+								);
 
-					section_list.push_back(
-								BuildSectionImageInfo(section.name())
+					CLOUD_PRINTER_TRACE(
+								"build section count is " +
+								String::number(section_path_list.count())
+								);
+
+					for(const SectionPathInfo& section: section_path_list){
+						DataFile section_image = DataFile(
+									File::Path(section.path())
+									);
+
+						CLOUD_PRINTER_TRACE("Adding section " + section.name());
+
+						section_list.push_back(
+									BuildSectionImageInfo(section.name())
 									.set_image_data(section_image.data())
+									);
+
+					}
+
+
+					CLOUD_PRINTER_TRACE(
+								String().format(
+									"secret key at 0x%X:%d",
+									mcu_board_config.secret_key_address,
+									mcu_board_config.secret_key_size
+									)
 								);
 
 				}
 
-
+				//write file_image to data_image
+				data_image.write(
+							file_image,
+							File::PageSize(1024)
+							);
+				file_image.close();
 
 				CLOUD_PRINTER_TRACE(
-							String().format(
-								"secret key 0x%X:%d",
-								mcu_board_config.secret_key_address,
-								mcu_board_config.secret_key_size
-								)
+							"create data copy of image size " +
+							String::number(data_image.size())
 							);
 
+				local_build_image_list.push_back(
+							BuildImageInfo()
+							.set_name(build_directory_entry)
+							.set_image_data(data_image.data())
+							.set_secret_key_position(mcu_board_config.secret_key_address)
+							.set_secret_key_size(mcu_board_config.secret_key_size)
+							.set_section_list(section_list)
+							);
+
+				CLOUD_PRINTER_TRACE(
+							"array has " + String::number(local_build_image_list.count()) + " images"
+							);
+			} else {
+				CLOUD_PRINTER_TRACE("Not importing build " + build_directory_entry);
+				CLOUD_PRINTER_TRACE("Build specified was " + normalize_name(options.build()));
+				CLOUD_PRINTER_TRACE("Build application arch " + application_architecture());
 			}
-
-			//write file_image to data_image
-			data_image.write(
-						file_image,
-						File::PageSize(1024)
-						);
-			file_image.close();
-
-			CLOUD_PRINTER_TRACE(
-						"create data copy of image size " +
-						String::number(data_image.size())
-						);
-
-			local_build_image_list.push_back(
-						BuildImageInfo()
-						.set_name(build_directory_entry)
-						.set_image_data(data_image.data())
-						.set_secret_key_position(mcu_board_config.secret_key_address)
-						.set_secret_key_size(mcu_board_config.secret_key_size)
-						.set_section_list(section_list)
-						);
-
-			CLOUD_PRINTER_TRACE(
-						"array has " + String::number(local_build_image_list.count()) + " images"
-						);
-
-
 		}
 	}
 
@@ -584,7 +593,6 @@ JsonObject Build::import_disassembly(
 	 *
 	 */
 
-	File f;
 	String lst_path = String() << path.argument() << ".lst";
 	String json_path = String() << path.argument()  << ".json";
 	String binary_path = String() << path.argument();
@@ -673,13 +681,15 @@ JsonObject Build::import_disassembly(
 								"open lst file " + lst_path
 								);
 
-	if( f.open(
-				lst_path,
-				fs::OpenFlags::read_only()
-				) < 0 ){
-		//error_message().format("Failed to open file '%s'", path.cstring());
+	DataFile f = DataFile(DataFile::Path(lst_path));
+
+	if( f.size() == 0 ){
+		PRINTER_TRACE(printer,
+									"failed to load lst file " + lst_path
+									);
 		return JsonObject();
 	}
+
 
 	String line;
 	String current_label;
@@ -697,20 +707,7 @@ JsonObject Build::import_disassembly(
 
 	current_section = "";
 
-	Data contents;
-	contents.allocate(f.size());
-
-	if( contents.size() != f.size() ){
-		return JsonObject();
-	}
-
-	if( f.read(
-				contents
-				) != contents.size() ){
-		return JsonObject();
-	}
-
-	f.close();
+	const Data & contents = f.data();
 
 
 	ReferenceFile data_file(fs::OpenFlags::read_only());

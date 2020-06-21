@@ -169,6 +169,15 @@ private:
 
 };
 
+class BuildImportOptions {
+	API_ACCESS_COMPOUND(BuildImportOptions,var::String,path);
+	API_ACCESS_COMPOUND(BuildImportOptions,var::String,build);
+	API_ACCESS_COMPOUND(BuildImportOptions,var::String,application_architecture);
+
+public:
+
+};
+
 /*! \brief Build Class
  * \details The Build class represents a versioned build
  * of a project or just raw file data.
@@ -209,7 +218,7 @@ public:
 	 * local filesystem.
 	 *
 	 */
-	int import_from_compiled(const var::String& path);
+	int import_from_compiled(const BuildImportOptions& options);
 
 	JSON_ACCESS_STRING(Build,name);
 	JSON_ACCESS_STRING(Build,version);

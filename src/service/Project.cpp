@@ -106,7 +106,10 @@ int Project::publish_build(
 				"import build from " +
 				options.file_path()
 				);
-	if( build.import_from_compiled(options.file_path()) < 0 ){
+	if( build.import_from_compiled(
+				BuildImportOptions()
+				.set_path(options.file_path())
+				) < 0 ){
 		printer().error("Failed to import build");
 		return -1;
 	}

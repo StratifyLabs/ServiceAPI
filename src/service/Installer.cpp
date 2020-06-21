@@ -191,9 +191,16 @@ bool Installer::install_path(const InstallerOptions& options){
 	Build b;
 
 	set_project_name( FileInfo::name(options.project_path()) );
+
+	CLOUD_PRINTER_TRACE("set build application architecture to " + architecture() );
+
 	if( b.import_from_compiled(
-				options.project_path()
+				BuildImportOptions()
+				.set_path(options.project_path())
+				.set_build(options.build_name())
+				.set_application_architecture( architecture() )
 				) < 0 ){
+
 		return false;
 	}
 
@@ -362,8 +369,6 @@ bool Installer::install_application_build(
 		const InstallerOptions& options
 		){
 
-	build.set_application_architecture( architecture() );
-
 	DataFile image(OpenFlags::read_write());
 	image.data() = build.get_image(
 				options.build_name()
@@ -371,8 +376,8 @@ bool Installer::install_application_build(
 
 	if( image.data().size() == 0 ){
 		set_error_message(
-					"can't install build with name " +
-					build.normalize_name(options.build_name())
+					"can't install build with name `" +
+					build.normalize_name(options.build_name()) + "`"
 					);
 		return false;
 	}
