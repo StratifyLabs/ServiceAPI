@@ -60,7 +60,7 @@ public:
 
 class BuildSectionImageInfo : public var::JsonKeyValue {
 public:
-	BuildSectionImageInfo(const var::String& key) :
+	explicit BuildSectionImageInfo(const var::String& key) :
 		JsonKeyValue(key, var::JsonObject()){
 	}
 
@@ -131,7 +131,7 @@ public:
 class BuildOptions : public cloud::DocumentOptionsAccess<BuildOptions> {
 public:
 
-	BuildOptions(const var::String& project_id){
+	explicit BuildOptions(const var::String& project_id){
 		set_project_id(project_id);
 		set_path("projects/" + project_id + "/builds");
 	}

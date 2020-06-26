@@ -7,7 +7,7 @@ namespace service {
 
 class UserAdminProfileOptions : public cloud::DocumentOptionsAccess<UserAdminProfileOptions> {
 public:
-	UserAdminProfileOptions(const var::String& user_id){
+	explicit UserAdminProfileOptions(const var::String& user_id){
 		set_path("users/" + user_id + "/admin");
 	}
 };
@@ -19,7 +19,7 @@ public:
 
 class UserPublicProfileOptions : public cloud::DocumentOptionsAccess<UserPublicProfileOptions> {
 public:
-	UserPublicProfileOptions(const var::String& user_id){
+	explicit UserPublicProfileOptions(const var::String& user_id){
 		set_path("users/" + user_id + "/public");
 	}
 };
@@ -37,7 +37,7 @@ public:
 
 class UserPrivateProfileOptions : public cloud::DocumentOptionsAccess<UserPrivateProfileOptions> {
 public:
-	UserPrivateProfileOptions(const var::String& user_id){
+	explicit UserPrivateProfileOptions(const var::String& user_id){
 		set_path("users/" + user_id + "/private");
 	}
 };

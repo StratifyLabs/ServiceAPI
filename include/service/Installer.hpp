@@ -86,7 +86,7 @@ public:
 
 class Installer : public cloud::CloudObject {
 public:
-	Installer(sys::Link * connection);
+	explicit Installer(sys::Link * connection);
 
 	bool install(const InstallerOptions& options);
 

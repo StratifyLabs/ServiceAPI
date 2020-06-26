@@ -22,7 +22,7 @@ class ThingSystemInformation : public var::JsonValue {
 public:
 	JSON_ACCESS_CONSTRUCT_OBJECT(ThingSystemInformation);
 
-	ThingSystemInformation(const sys::SysInfo & info) : JsonValue(var::JsonObject()){
+	explicit ThingSystemInformation(const sys::SysInfo & info) : JsonValue(var::JsonObject()){
 		set_application_signature(var::String::number(info.application_signature(), "0x%08X"));
 		set_architecture(info.cpu_architecture());
 		set_bsp_git_hash(info.bsp_git_hash());
@@ -62,7 +62,7 @@ public:
 class Thing : public cloud::DocumentAccess<Thing> {
 public:
 	Thing();
-	Thing(const sys::SysInfo & info);
+	explicit Thing(const sys::SysInfo & info);
 
 	JSON_ACCESS_STRING_WITH_KEY(Thing,secretKey,secret_key);
 	JSON_ACCESS_STRING(Thing,permissions);

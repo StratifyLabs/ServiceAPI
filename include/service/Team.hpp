@@ -7,7 +7,7 @@ namespace service {
 
 class TeamUserOptions: public cloud::DocumentOptionsAccess<TeamUserOptions> {
 public:
-	TeamUserOptions(
+	explicit TeamUserOptions(
 			const var::String& team_id
 			){
 		//document id is the user id

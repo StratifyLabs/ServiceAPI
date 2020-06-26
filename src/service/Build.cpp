@@ -278,7 +278,8 @@ int Build::download(const var::String& url){
 	}
 
 	{
-		Build downloaded_build = JsonDocument().load(
+		Build downloaded_build =
+				JsonDocument().load(
 					response_string
 					).to_object();
 
@@ -359,7 +360,7 @@ Build& Build::insert_secret_key(
 
 	if( secret_key.size() == 0 ){
 		random.seed(Data());
-		int random_result = random.randomize(random_secret_key);
+		//int random_result = random.randomize(random_secret_key);
 		secret_key_reference = random_secret_key;
 	} else {
 		secret_key_reference = secret_key;

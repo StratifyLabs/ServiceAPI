@@ -12,7 +12,7 @@ namespace service {
 
 class ProjectBuildItem : public var::JsonKeyValue {
 public:
-	ProjectBuildItem(const var::String& key, const var::JsonValue& value = var::JsonString())
+	explicit ProjectBuildItem(const var::String& key, const var::JsonValue& value = var::JsonString())
 		:JsonKeyValue(key, value){}
 
 	JSON_ACCESS_KEY_VALUE_PAIR_STRING(ProjectBuildItem,id,version);
@@ -65,7 +65,7 @@ class Project : public cloud::DocumentAccess<Project> {
 public:
 
 	Project();
-	Project(const var::JsonObject& object) : DocumentAccess(object){}
+	explicit Project(const var::JsonObject& object) : DocumentAccess(object){}
 
 	static var::String file_name(){
 		return "sl_settings.json";
