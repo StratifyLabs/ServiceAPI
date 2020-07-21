@@ -37,6 +37,7 @@ private:
 	API_ACCESS_COMPOUND(ProjectBuildOptions,var::String,target);
 	API_ACCESS_COMPOUND(ProjectBuildOptions,var::String,touch_path);
 	API_ACCESS_BOOL(ProjectBuildOptions,dry_run,false);
+	API_ACCESS_BOOL(ProjectBuildOptions,reconfigure,false);
 };
 
 class ProjectOptions : public cloud::DocumentOptionsAccess<ProjectOptions> {
