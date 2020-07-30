@@ -52,6 +52,12 @@ int Project::publish_build(
 		return -1;
 	}
 
+	if( (permissions == "private") &&
+			get_team_id().is_empty() ){
+		printer().error("`private` permissions can only be used with a valid team id");
+		return -1;
+	}
+
 	CLOUD_PRINTER_TRACE("check for valid project id " + project_document_id);
 	//if project hasn't been published before, upload it now and add the document id
 	if( (project_document_id == "<invalid>") ||
@@ -87,14 +93,17 @@ int Project::publish_build(
 
 	Project existing_project;
 
+	CLOUD_PRINTER_TRACE("download project with id: " + project_document_id + " and team " + get_team_id());
 	if( existing_project.download(
 				ProjectOptions()
 				.set_document_id(project_document_id)
 				.set_team_id(get_team_id())
 				) < 0 ){
+		printer().error("Failed to download existing project");
 		return -1;
 	}
 
+	CLOUD_PRINTER_TRACE("does user own project " + existing_project.get_user_id() + " == " + cloud().credentials().get_uid());
 	if( existing_project.get_user_id() != cloud().credentials().get_uid() ){
 		printer().error("project permissions error (not owner)");
 		return -1;

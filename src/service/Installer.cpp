@@ -90,6 +90,11 @@ bool Installer::install_id(const InstallerOptions& options){
 				.set_document_id(options.project_id())
 				.set_team_id(options.team_id())
 				)< 0 ){
+		if( options.team_id().is_empty() == false ){
+			set_error_message("Failed to download team/project id" + options.team_id() + " : " + options.project_id());
+		} else {
+			set_error_message("Failed to download project with id " + options.project_id());
+		}
 		return false;
 	}
 
