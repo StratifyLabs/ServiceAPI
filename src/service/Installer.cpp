@@ -374,6 +374,7 @@ bool Installer::install_application_build(
 		const InstallerOptions& options
 		){
 
+	CLOUD_PRINTER_TRACE("load image for " + options.build_name());
 	DataFile image(OpenFlags::read_write());
 	image.data() = build.get_image(
 				options.build_name()
@@ -384,6 +385,7 @@ bool Installer::install_application_build(
 					"can't install build with name `" +
 					build.normalize_name(options.build_name()) + "`"
 					);
+		CLOUD_PRINTER_TRACE("image not found for " + options.build_name());
 		return false;
 	}
 
@@ -553,6 +555,8 @@ bool Installer::install_application_image(
 		const InstallerOptions& options
 		){
 
+	CLOUD_PRINTER_TRACE("install application image");
+
 	{
 		int result;
 
@@ -569,6 +573,7 @@ bool Installer::install_application_image(
 	}
 
 	int app_pid = connection()->get_pid(project_name());
+	CLOUD_PRINTER_TRACE("pid is " + String::number(app_pid));
 	if( options.is_kill() ){
 		if( app_pid > 0 ){
 			printer().key(
@@ -593,11 +598,13 @@ bool Installer::install_application_image(
 						"the application will be sent a kill signal "
 						"as part of the installation."
 						);
+			CLOUD_PRINTER_TRACE("application is already running");
 			return false;
 		}
 	}
 
 	if( options.is_clean() ){
+		CLOUD_PRINTER_TRACE("clean");
 		clean_application();
 	}
 
@@ -610,6 +617,8 @@ bool Installer::install_application_image(
 	} else {
 		is_flash_available = false;
 	}
+
+	CLOUD_PRINTER_TRACE(is_flash_available ? String("Flash is available") : String("Flash not available"));
 
 	VersionString version;
 	version.string() = options.version();

@@ -5,6 +5,7 @@ namespace service{}
 
 #include "service/Build.hpp"
 #include "service/Project.hpp"
+#include "service/Report.hpp"
 #include "service/Thing.hpp"
 #include "service/User.hpp"
 #include "service/Team.hpp"

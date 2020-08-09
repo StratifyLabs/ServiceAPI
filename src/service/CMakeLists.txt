@@ -9,4 +9,5 @@ set(SOURCES
 	Team.cpp
 	User.cpp
 	Thing.cpp
+	Report.cpp
 	PARENT_SCOPE)
