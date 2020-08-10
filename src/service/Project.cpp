@@ -38,7 +38,7 @@ int Project::publish_build(
 
 	//check the current version against the versions in the build list
 	if( is_build_version_valid(version) == false ){
-		printer().error("version must be greater than latest published version");
+		set_error_message("version must be greater than latest published version");
 		return -1;
 	}
 
@@ -48,13 +48,13 @@ int Project::publish_build(
 			(permissions != "private") &&
 			(permissions != "searchable")
 			){
-		printer().error("permissions must be <public|private|searchable>");
+		set_error_message("permissions must be <public|private|searchable>");
 		return -1;
 	}
 
 	if( (permissions == "private") &&
 			get_team_id().is_empty() ){
-		printer().error("`private` permissions can only be used with a valid team id");
+		set_error_message("`private` permissions can only be used with a valid team id");
 		return -1;
 	}
 
@@ -65,7 +65,7 @@ int Project::publish_build(
 		CLOUD_PRINTER_TRACE("upload project and assign id");
 		project_document_id = upload();
 		if( project_document_id.is_empty() ){
-			printer().error("failed to pre-publish project");
+			set_error_message("failed to pre-publish project");
 			return -1;
 		}
 		CLOUD_PRINTER_TRACE("assign " + project_document_id + " as project id");
@@ -93,19 +93,29 @@ int Project::publish_build(
 
 	Project existing_project;
 
-	CLOUD_PRINTER_TRACE("download project with id: " + project_document_id + " and team " + get_team_id());
+	CLOUD_PRINTER_TRACE("download project with id: " + project_document_id);
 	if( existing_project.download(
 				ProjectOptions()
 				.set_document_id(project_document_id)
-				.set_team_id(get_team_id())
 				) < 0 ){
-		printer().error("Failed to download existing project");
+
+		set_error_message("Failed to download existing project `" + project_document_id + "`");
 		return -1;
 	}
 
+	printer().object("existing project", existing_project, Printer::level_trace);
+
+	CLOUD_PRINTER_TRACE("existing team project id `" + existing_project.get_team_id() + "`");
 	CLOUD_PRINTER_TRACE("does user own project " + existing_project.get_user_id() + " == " + cloud().credentials().get_uid());
-	if( existing_project.get_user_id() != cloud().credentials().get_uid() ){
-		printer().error("project permissions error (not owner)");
+
+	if( get_team_id() != existing_project.get_team_id() ){
+		set_error_message("the local team ID `" + get_team_id() + "` does not match the team for the published project `" + existing_project.get_team_id() + "`");
+		return -1;
+	}
+
+	if( existing_project.get_team_id().is_empty()
+			&& existing_project.get_user_id() != cloud().credentials().get_uid() ){
+		set_error_message("project permissions error (not owner)");
 		return -1;
 	}
 
@@ -119,7 +129,7 @@ int Project::publish_build(
 				BuildImportOptions()
 				.set_path(options.file_path())
 				) < 0 ){
-		printer().error("Failed to import build");
+		set_error_message("Failed to import build");
 		return -1;
 	}
 
@@ -156,6 +166,8 @@ int Project::publish_build(
 	build.set_readme(base64_readme);
 	build.set_description(options.change_description());
 	build.set_version(version.string());
+	build.set_team_id(get_team_id());
+	build.set_permissions(get_permissions());
 
 
 	CLOUD_PRINTER_TRACE("assigned readme to build");
@@ -165,11 +177,10 @@ int Project::publish_build(
 	build_id = build.upload(
 				BuildOptions(project_document_id)
 				.set_dry_run(options.is_dry_run())
-				.set_team_id(get_team_id())
 				);
 	if( build_id.is_empty() ){
 		//failed to upload the build
-		printer().error("failed to upload build information");
+		set_error_message("failed to upload build information");
 		return -1;
 	}
 
@@ -200,7 +211,7 @@ int Project::publish_build(
 						error_message()
 						);
 
-			printer().error(
+			set_error_message(
 						"failed to update project"
 						);
 
@@ -279,7 +290,6 @@ Build Project::download_build(
 	result.download(
 				BuildOptions(get_document_id())
 				.set_document_id(build_id)
-				.set_team_id(get_team_id())
 				);
 
 	return result;

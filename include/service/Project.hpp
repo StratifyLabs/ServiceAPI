@@ -84,7 +84,6 @@ public:
 		return Document::upload(
 					ProjectOptions()
 					.set_document_id(id)
-					.set_team_id(get_team_id())
 					);
 	}
 
@@ -109,7 +108,7 @@ public:
 	JSON_ACCESS_STRING(Project,permissions);
 	JSON_ACCESS_STRING(Project,readme);
 	JSON_ACCESS_STRING_WITH_KEY(Project,ramSize,ram_size);
-	JSON_ACCESS_STRING_WITH_KEY(Project,teamId,team_id);
+	JSON_ACCESS_STRING_WITH_KEY(Project,team,team_id);
 	JSON_ACCESS_OBJECT_LIST_WITH_KEY(Project,ProjectBuildItem,buildList,build_list);
 
 	var::String get_storage_path(

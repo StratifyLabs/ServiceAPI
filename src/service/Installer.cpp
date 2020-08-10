@@ -88,7 +88,6 @@ bool Installer::install_id(const InstallerOptions& options){
 	if( p.download(
 				ProjectOptions()
 				.set_document_id(options.project_id())
-				.set_team_id(options.team_id())
 				)< 0 ){
 		if( options.team_id().is_empty() == false ){
 			set_error_message("Failed to download team/project id" + options.team_id() + " : " + options.project_id());
@@ -272,7 +271,6 @@ bool Installer::update_apps(
 		app_project.download(
 					ProjectOptions()
 					.set_document_id( app.info().id() )
-					.set_team_id( options.team_id() )
 					);
 
 		VersionString current_version(app.info().version());
@@ -317,7 +315,6 @@ bool Installer::update_os(const InstallerOptions& options){
 	os_project.download(
 				ProjectOptions()
 				.set_document_id( connection()->sys_info().id() )
-				.set_team_id( connection()->sys_info().team_id() )
 				);
 
 	VersionString current_version(connection()->sys_info().system_version());
@@ -433,7 +430,6 @@ bool Installer::install_os_build(
 			if( thing.download(
 						ThingOptions()
 						.set_document_id(thing_id)
-						.set_team_id(thing_team)
 						) >= 0 ){
 				CLOUD_PRINTER_TRACE("Got secret key from thing");
 				existing_secret_key = thing.get_secret_key();

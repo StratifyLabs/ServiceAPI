@@ -20,8 +20,6 @@ Thing::Thing(const sys::SysInfo & info){
 
 var::String Thing::upload(){
 
-	ThingOptions options;
-
 	String id;
 
 	id = get_system_information().get_serial_number();
@@ -51,7 +49,6 @@ var::String Thing::upload(){
 	bool is_create = Thing().download(
 				ThingOptions()
 				.set_document_id(id)
-				.set_team_id(get_team_id())
 				) < 0;
 
 	CLOUD_PRINTER_TRACE("Thing needs to be created? " + String::number(is_create));
@@ -59,7 +56,6 @@ var::String Thing::upload(){
 	return Document::upload(
 				ThingOptions()
 				.set_document_id(id)
-				.set_team_id(get_team_id())
 				.set_create(is_create)
 				);
 }

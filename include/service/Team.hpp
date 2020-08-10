@@ -18,10 +18,11 @@ public:
 class TeamUser: public cloud::DocumentAccess<TeamUser> {
 public:
 	JSON_ACCESS_BOOL(TeamUser,create);
-	JSON_ACCESS_BOOL(TeamUser,delete);
+	JSON_ACCESS_BOOL(TeamUser,remove);
 	JSON_ACCESS_BOOL(TeamUser,read);
 	JSON_ACCESS_BOOL(TeamUser,update);
 	JSON_ACCESS_BOOL(TeamUser,write);
+	JSON_ACCESS_BOOL(TeamUser,admin);
 };
 
 class TeamOptions: public cloud::DocumentOptionsAccess<TeamOptions> {

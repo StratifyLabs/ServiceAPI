@@ -47,7 +47,7 @@ public:
 	JSON_ACCESS_STRING_WITH_KEY(ThingSystemInformation,projectId,project_id);
 	JSON_ACCESS_STRING_WITH_KEY(ThingSystemInformation,serialNumber,serial_number);
 	JSON_ACCESS_STRING_WITH_KEY(ThingSystemInformation,sosGitHash,sos_git_hash);
-	JSON_ACCESS_STRING_WITH_KEY(ThingSystemInformation,teamId,team_id);
+	JSON_ACCESS_STRING_WITH_KEY(ThingSystemInformation,team,team_id);
 	JSON_ACCESS_STRING(ThingSystemInformation,version);
 
 };
@@ -77,7 +77,6 @@ public:
 		return Document::download(
 					ThingOptions()
 					.set_document_id(info.serial_number().to_string())
-					.set_team_id(info.team_id())
 					);
 	}
 

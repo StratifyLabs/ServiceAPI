@@ -24,9 +24,9 @@ int Build::import_from_compiled(
 			Project().load(options.path() + "/" + Project::file_name());
 
 	if( project_settings.is_valid() == false ){
-		printer().error(
-					"Failed to open project settings at %s",
-					options.path().cstring()
+		set_error_message(
+					"Failed to open project settings at `" +
+					options.path() + "`"
 					);
 		return -1;
 	}
@@ -77,9 +77,9 @@ int Build::import_from_compiled(
 							file_path,
 							fs::OpenFlags::read_only()
 							) < 0 ){
-					printer().error(
-								"failed to open build image at %s",
-								file_path.cstring()
+					set_error_message(
+								"failed to open build image at `" +
+								file_path + "`"
 								);
 					return -1;
 
@@ -228,7 +228,7 @@ int Build::download(const BuildOptions& options){
 					options.storage_path(),
 					image
 					) < 0 ){
-			printer().error(
+			set_error_message(
 						"Failed to download binary from " +
 						options.storage_path()
 						);
@@ -335,7 +335,7 @@ Build& Build::insert_secret_key(
 
 	if( image_info.is_valid() == false ){
 		//printer error?
-		printer().error("failed to find build image data for " + build_name);
+		set_error_message("failed to find build image data for " + build_name);
 		return *this;
 	}
 
@@ -343,13 +343,13 @@ Build& Build::insert_secret_key(
 	u32 size = image_info.get_secret_key_size();
 
 	if( size == 0 ){
-		printer().error("image has not allocated space for a key");
+		set_error_message("image has not allocated space for a key");
 		return *this;
 	}
 
 	crypto::Random random;
 	if( random.initialize() < 0 ){
-		printer().error(
+		set_error_message(
 					"failed to initialize random number generator"
 					);
 		return *this;
@@ -365,7 +365,7 @@ Build& Build::insert_secret_key(
 	} else {
 		secret_key_reference = secret_key;
 		if( secret_key.size() < size ){
-			printer().error(
+			set_error_message(
 						"provided secret key is smaller than required"
 						);
 			return *this;
@@ -391,7 +391,7 @@ Build& Build::insert_secret_key(
 						image_file.error_number()
 						)
 					);
-		printer().error(
+		set_error_message(
 					"Failed to write secret key to binary image"
 					);
 		return *this;
