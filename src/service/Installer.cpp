@@ -536,11 +536,19 @@ bool Installer::install_os_build(
 		thing.set_secret_key(
 					build.build_image_info(options.build_name()).get_secret_key()
 					);
+
 		printer() << thing;
 
-		if( thing.upload() < 0 ){
-			printer().warning("failed to synchronize thing");
+		if( cloud::Document::is_permissions_valid( build.get_permissions() ) ){
+			if( thing.get_permissions().is_empty() ){
+				thing.set_permissions(build.get_permissions());
+			}
+			if( thing.upload() < 0 ){
+				printer().warning("failed to synchronize thing");
+			}
 		}
+
+
 	}
 
 	return result;
