@@ -28,8 +28,6 @@ public:
 	JSON_ACCESS_STRING_WITH_KEY(Report,thingId,thing_id);
 	//if a project is associated with this report
 	JSON_ACCESS_STRING_WITH_KEY(Report,projectId,project_id);
-	//comma separated list of tags
-	JSON_ACCESS_STRING(Report,tags);
 
 	var::String upload(const ReportOptions& options);
 
