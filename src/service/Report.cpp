@@ -11,6 +11,8 @@ var::String Report::upload(const ReportOptions & options){
 	//publish the report to storage
 	API_ASSERT(options.file() != nullptr);
 
+	API_ASSERT(!get_name().is_empty());
+
 
 	String report_id = Document::upload(options);
 	if( report_id.is_empty() ){

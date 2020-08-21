@@ -19,6 +19,15 @@ public:
 
 };
 
+class ProjectThreadStackItem : public var::JsonKeyValue {
+public:
+	explicit ProjectThreadStackItem(const var::String& key, const var::JsonValue& value = var::JsonInteger())
+		:JsonKeyValue(key, value){}
+
+	JSON_ACCESS_KEY_VALUE_PAIR_INTEGER(ProjectThreadStackItem,name,stack_size);
+
+};
+
 using ProjectBuildList = var::JsonKeyValueList<ProjectBuildItem>;
 
 
@@ -110,6 +119,7 @@ public:
 	JSON_ACCESS_STRING_WITH_KEY(Project,ramSize,ram_size);
 	JSON_ACCESS_STRING_WITH_KEY(Project,team,team_id);
 	JSON_ACCESS_OBJECT_LIST_WITH_KEY(Project,ProjectBuildItem,buildList,build_list);
+	JSON_ACCESS_OBJECT_LIST_WITH_KEY(Project,ProjectThreadStackItem,threadStackList,thread_stack_list);
 
 	var::String get_storage_path(
 			const ProjectOptions& options
