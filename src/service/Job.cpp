@@ -87,35 +87,24 @@ bool JobServer::listen(){
 
 bool JobServer::listen_callback(const var::String & event, const var::JsonValue & data){
 	bool result = true;
+	MCU_UNUSED_ARGUMENT(event);
+	if( data.is_valid() && data.is_object() ){
+		const String path = "jobs/" + id();
+		JobObject object = cloud().get_database_object(
+					path
+					);
 
-	if( data.is_valid() ){
-	JobObject object = cloud().get_database_object(
-				"jobs/" + id());
 
-	if( callback() ){
-		JobReport job_report = callback()(context(), object.set_document_id(id()));
 
-		if( job_report.is_stop() ){
-			CLOUD_PRINTER_TRACE("stop listening on stop");
-			result = false;
+		if( (object.get_input().to_object().is_empty() == false) && callback() ){
+			String report_id = callback()(context(), object.set_document_id(id()));
+
+			cloud().patch_database_object(
+						path, JobObject().set_document_id(id()).set_type(type()).set_input(JsonString("")).set_report(report_id)
+						);
+
+
 		}
-
-		if( timeout().seconds() > 0 && m_timeout_timer > timeout() ){
-			CLOUD_PRINTER_TRACE("stop listening on timeout");
-			result = false;
-		}
-
-		if( job_report.is_valid() ){
-			CLOUD_PRINTER_TRACE("uploading job report to the cloud");
-			if( job_report.report().upload(job_report.options()).is_empty() ){
-				CLOUD_PRINTER_TRACE("stop listening on report failed");
-				result = false;
-			}
-		}
-
-	}
-	//data has arrived and is available in m_streaming_file
-
 	}
 	return result;
 }

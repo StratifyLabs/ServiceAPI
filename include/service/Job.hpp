@@ -31,12 +31,6 @@ public:
 	}
 };
 
-class JobReport {
-	API_AC(JobReport,Report,report);
-	API_AC(JobReport,ReportOptions,options);
-	API_AB(JobReport,stop,false);
-	API_AB(JobReport,valid,false);
-};
 
 class Job : public cloud::CloudAccess {
 public:
@@ -53,7 +47,7 @@ class JobServer : public cloud::CloudAccess {
 public:
 	JobServer(){}
 	~JobServer();
-	typedef JobReport (*callback_t)(void * context, const JobObject & job);
+	typedef var::String (*callback_t)(void * context, const JobObject & job);
 
 	var::String create();
 	bool listen();
