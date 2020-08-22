@@ -15,6 +15,18 @@ class JobOptions {
 	API_AC(JobOptions,chrono::MicroTime,timeout);
 };
 
+class JobInputValue : public var::JsonKeyValue {
+public:
+	JobInputValue(const var::String & key, const var::JsonValue & value) :
+		JsonKeyValue(key, value){}
+};
+
+class JobOutputValue : public var::JsonKeyValue {
+public:
+	JobOutputValue(const var::String & key, const var::JsonValue & value) :
+		JsonKeyValue(key, value){}
+};
+
 class JobObject : public var::JsonObject {
 public:
 
@@ -23,8 +35,8 @@ public:
 
 	JSON_ACCESS_STRING_WITH_KEY(JobObject,documentId,document_id);
 	JSON_ACCESS_STRING(JobObject,type);
-	JSON_ACCESS_STRING(JobObject,report);
-	JSON_ACCESS_OBJECT(JobObject,var::JsonValue,input);
+	JSON_ACCESS_OBJECT_LIST(JobObject,JobInputValue,input);
+	JSON_ACCESS_OBJECT_LIST(JobObject,JobOutputValue,output);
 
 	bool is_valid() const {
 		return get_type().is_empty() == false;
@@ -36,7 +48,8 @@ class Job : public cloud::CloudAccess {
 public:
 	Job();
 
-	var::String publish(const JobOptions & options);
+	bool ping(const JobOptions & options);
+	var::JsonValue publish(const JobOptions & options);
 
 private:
 	API_AC(Job,chrono::MicroTime,timeout);
@@ -47,13 +60,14 @@ class JobServer : public cloud::CloudAccess {
 public:
 	JobServer(){}
 	~JobServer();
-	typedef var::String (*callback_t)(void * context, const JobObject & job);
+	typedef var::JsonValue (*callback_t)(void * context, const var::String & type, const var::JsonValue & input_value);
 
 	var::String create();
 	bool listen();
 
 private:
 	API_AC(JobServer,var::String,type);
+	API_AB(JobServer,stop,false);
 	API_AC(JobServer,chrono::MicroTime,timeout);
 	API_AF(JobServer,callback_t,callback,nullptr);
 	API_AF(JobServer,void*,context,nullptr);
