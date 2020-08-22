@@ -9,6 +9,7 @@ namespace service{}
 #include "service/Thing.hpp"
 #include "service/User.hpp"
 #include "service/Team.hpp"
+#include "service/Job.hpp"
 #include "service/Installer.hpp"
 #include "service/DatumDocument.hpp"
 #include "service/TestResult.hpp"
