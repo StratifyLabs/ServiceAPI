@@ -86,6 +86,7 @@ public:
 
 private:
 	API_AC(Job,chrono::MicroTime,timeout);
+	API_AB(Job,stop,false);
 
 };
 

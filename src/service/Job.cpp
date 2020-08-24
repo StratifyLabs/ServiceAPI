@@ -23,7 +23,6 @@ var::JsonValue Job::publish(const JobOptions & options){
 
 	const String object_path = "jobs/" + job_document.get_id();
 
-
 	//does the job exists
 	JobObject job_object = cloud().get_database_object(
 				object_path,
@@ -61,6 +60,7 @@ var::JsonValue Job::publish(const JobOptions & options){
 
 		} while( (options.timeout().seconds() == 0
 							|| timeout_timer < options.timeout())
+						 && !is_stop()
 						 );
 
 	}
@@ -122,6 +122,10 @@ var::String JobServer::create(const JobOptions & options){
 			.set_team_id(options.team())
 			.set_key(Base64::encode(key))
 			.upload(JobDocumentOptions().set_create(true));
+
+	if( m_document_id.is_empty() ){
+		CLOUD_PRINTER_TRACE(cloud().document_traffic());
+	}
 
 	return m_document_id;
 }
