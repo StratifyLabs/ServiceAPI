@@ -356,12 +356,12 @@ Build& Build::insert_secret_key(
 	}
 
 	Reference secret_key_reference;
-	Data random_secret_key(size);
+	Data generate_secret_key;
 
 	if( secret_key.size() == 0 ){
-		random.seed(Data());
-		//int random_result = random.randomize(random_secret_key);
-		secret_key_reference = random_secret_key;
+
+		generate_secret_key = Random::get_data(size);
+		secret_key_reference = generate_secret_key;
 	} else {
 		secret_key_reference = secret_key;
 		if( secret_key.size() < size ){
