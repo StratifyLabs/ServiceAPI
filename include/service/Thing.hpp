@@ -65,9 +65,7 @@ public:
 	explicit Thing(const sys::SysInfo & info);
 
 	JSON_ACCESS_STRING_WITH_KEY(Thing,secretKey,secret_key);
-	JSON_ACCESS_STRING(Thing,permissions);
 	JSON_ACCESS_OBJECT_WITH_KEY(Thing,ThingSystemInformation,systemInformation,system_information);
-
 
 	int download(const ThingOptions& options){
 		return Document::download(options);

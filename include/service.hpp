@@ -8,6 +8,7 @@ namespace service{}
 #include "service/Report.hpp"
 #include "service/Thing.hpp"
 #include "service/User.hpp"
+#include "service/Hardware.hpp"
 #include "service/Team.hpp"
 #include "service/Job.hpp"
 #include "service/Installer.hpp"

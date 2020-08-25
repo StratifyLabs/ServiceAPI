@@ -6,6 +6,7 @@ set(SOURCES
 	TestResult.cpp
 	Project.cpp
 	Team.cpp
+	Hardware.cpp
 	User.cpp
 	Thing.cpp
 	Report.cpp
