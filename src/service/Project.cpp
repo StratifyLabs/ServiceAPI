@@ -317,13 +317,6 @@ var::String Project::get_build_id(
 
 		if( version_string.string().is_empty() ){
 			//grab the latest
-			PRINTER_TRACE(
-						printer(),
-						"Checking for the latest version " +
-						version.string() +
-						" > " +
-						latest_version.string()
-						);
 			if( version > latest_version ){
 				latest_version = version;
 				build_id = item.key();

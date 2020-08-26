@@ -403,6 +403,7 @@ bool Installer::install_os_build(
 	//insert secret key
 	if( options.is_insert_key() ){
 
+		CLOUD_PRINTER_TRACE("inserting secret key");
 		/*
 		 * Options for the key in preferential order
 		 *
@@ -422,7 +423,7 @@ bool Installer::install_os_build(
 			thing_team = options.team_id();
 		}
 
-		if( !thing_team.is_empty() && options.secret_key().is_empty() && !options.is_rekey_thing() ){
+		if( options.secret_key().is_empty() && !options.is_rekey_thing() ){
 			Thing thing;
 			String thing_id = connection()->sys_info().serial_number().to_string();
 
