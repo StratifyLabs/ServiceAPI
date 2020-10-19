@@ -2,8 +2,8 @@
 
 set(SOURCES
 	Build.cpp
+	Document.cpp
 	Installer.cpp
-	TestResult.cpp
 	Project.cpp
 	Team.cpp
 	Hardware.cpp

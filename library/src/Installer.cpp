@@ -210,7 +210,7 @@ bool Installer::install_path(const InstallerOptions& options){
 
 	set_project_id( b.get_project_id() );
 
-	if( b.decode_build_type() == Build::type_application ){
+	if( b.decode_build_type() == Build::Type::application ){
 		if( options.is_application() == false ){
 			set_error_message("project path is an application but an"
 												"application install was not specified");
@@ -218,7 +218,7 @@ bool Installer::install_path(const InstallerOptions& options){
 		}
 	}
 
-	if( b.decode_build_type() == Build::type_os ){
+	if( b.decode_build_type() == Build::Type::os ){
 		if( options.is_os() == false ){
 			set_error_message("project path is an os but an"
 												"os install was not specified");
@@ -350,12 +350,12 @@ bool Installer::install_build(
 		const InstallerOptions& options
 		){
 
-	if( build.decode_build_type() == Build::type_application ){
+	if( build.decode_build_type() == Build::Type::application ){
 		CLOUD_PRINTER_TRACE("installing application build");
 		return install_application_build(build, options);
 	}
 
-	if( build.decode_build_type() == Build::type_os ){
+	if( build.decode_build_type() == Build::Type::os ){
 		CLOUD_PRINTER_TRACE("installing OS build");
 		return install_os_build(build, options);
 	}
@@ -540,7 +540,7 @@ bool Installer::install_os_build(
 
 		printer() << thing;
 
-		if( cloud::Document::is_permissions_valid( build.get_permissions() ) ){
+		if( Document::is_permissions_valid( build.get_permissions() ) ){
 			if( thing.get_permissions().is_empty() ){
 				thing.set_permissions(build.get_permissions());
 			}

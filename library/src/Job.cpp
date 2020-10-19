@@ -12,7 +12,7 @@ using namespace service;
 Job::Job(){}
 
 
-var::JsonValue Job::publish(const JobOptions & options){
+json::JsonValue Job::publish(const JobOptions & options){
 
 	JobDocument job_document;
 
@@ -46,7 +46,7 @@ var::JsonValue Job::publish(const JobOptions & options){
 			return JsonNull();
 		}
 
-		var::JsonObject object;
+		json::JsonObject object;
 
 		//wait for result to post
 		do {
@@ -153,7 +153,7 @@ bool JobServer::listen(){
 }
 
 JobIOValue& JobIOValue::encrypt_value(
-		const var::JsonValue & value,
+		const json::JsonValue & value,
 		const var::Data & crypto_key){
 
 	var::String string_value = JsonDocument()
@@ -168,7 +168,7 @@ JobIOValue& JobIOValue::encrypt_value(
 	return *this;
 }
 
-var::JsonValue JobIOValue::decrypt_value(const var::Data & crypto_key){
+json::JsonValue JobIOValue::decrypt_value(const var::Data & crypto_key){
 
 
 	//iv is 16 bytes -- 32 characters
@@ -193,7 +193,7 @@ var::JsonValue JobIOValue::decrypt_value(const var::Data & crypto_key){
 	return JsonDocument().load(json_string);
 }
 
-bool JobServer::listen_callback(const var::String & event, const var::JsonValue & data){
+bool JobServer::listen_callback(const var::String & event, const json::JsonValue & data){
 	MCU_UNUSED_ARGUMENT(event);
 	if( data.is_valid() && data.is_object() ){
 		const String path = "jobs/" + id();
@@ -202,7 +202,7 @@ bool JobServer::listen_callback(const var::String & event, const var::JsonValue 
 					path
 					);
 
-		var::JsonKeyValueList<JobIOValue> input_list = object.get_input();
+		json::JsonKeyValueList<JobIOValue> input_list = object.get_input();
 
 		var::StringList key_list = input_list.get_key_list();
 

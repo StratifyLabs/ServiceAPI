@@ -5,7 +5,7 @@
 
 namespace service {
 
-class TestResult : public cloud::Document {
+class TestResult : public Document {
 public:
 	TestResult();
 
