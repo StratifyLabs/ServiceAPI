@@ -2,8 +2,8 @@
 #define SERVICE_API_SERVICE_PROJECT_HPP
 
 #include <sos/Link.hpp>
+#include <sys/Version.hpp>
 #include <var/String.hpp>
-#include <var/VersionString.hpp>
 
 #include "Build.hpp"
 
@@ -111,33 +111,33 @@ public:
 
   Build download_build(const var::String &version) const;
 
-  bool is_build_version_valid(const var::VersionString &build_version) const;
+  bool is_build_version_valid(const sys::Version &build_version) const;
 
-  var::String get_build_id(const var::String &version) const;
+  var::String get_build_id(const var::StringView version) const;
 
   bool is_update_available(const var::String &current_version);
 
-  bool operator<(const var::VersionString &version) const {
+  bool operator<(const sys::Version &version) const {
     return compare(version) < 0;
   }
 
-  bool operator>(const var::VersionString &version) const {
+  bool operator>(const sys::Version &version) const {
     return compare(version) > 0;
   }
 
-  bool operator>=(const var::VersionString &version) const {
+  bool operator>=(const sys::Version &version) const {
     return compare(version) >= 0;
   }
 
-  bool operator<=(const var::VersionString &version) const {
+  bool operator<=(const sys::Version &version) const {
     return compare(version) <= 0;
   }
 
-  bool operator==(const var::VersionString &version) const {
+  bool operator==(const sys::Version &version) const {
     return compare(version) == 0;
   }
 
-  bool operator!=(const var::VersionString &version) const {
+  bool operator!=(const sys::Version &version) const {
     return compare(version) != 0;
   }
 
@@ -146,7 +146,7 @@ public:
 private:
   var::String get_storage_path(const PublishBuild &options) const;
 
-  int compare(const var::VersionString &version) const;
+  int compare(const sys::Version &version) const;
 };
 
 } // namespace service

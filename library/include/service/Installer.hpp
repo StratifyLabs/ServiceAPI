@@ -1,6 +1,7 @@
 #ifndef SERVICE_API_SERVICE_INSTALLER_HPP
 #define SERVICE_API_SERVICE_INSTALLER_HPP
 
+#include <chrono/ClockTimer.hpp>
 #include <sos/Link.hpp>
 #include <var/String.hpp>
 
@@ -8,134 +9,129 @@
 
 namespace service {
 
-class InstallerOptions {
-
-  // if id is provided -- download and install
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, project_id);
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, team_id);
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, url);
-  API_ACCESS_BOOL(InstallerOptions, update_os, false);
-  API_ACCESS_BOOL(InstallerOptions, update_apps, false);
-
-  // update directories
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, update_app_directories);
-
-  // path is a path to a project
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, project_path);
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, version);
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, build_name);
-
-  // path to an image to install
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, binary_path);
-  API_ACCESS_BOOL(InstallerOptions, application, false);
-  API_ACCESS_BOOL(InstallerOptions, os, false);
-
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, build_path);
-
-  // application options
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, destination);
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, suffix);
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, architecture);
-  API_ACCESS_BOOL(InstallerOptions, tightly_coupled_data, false);
-  API_ACCESS_BOOL(InstallerOptions, tightly_coupled_code, false);
-  API_ACCESS_BOOL(InstallerOptions, external_data, false);
-  API_ACCESS_BOOL(InstallerOptions, external_code, false);
-  API_ACCESS_BOOL(InstallerOptions, clean, false);
-  API_ACCESS_BOOL(InstallerOptions, force, false);
-  API_ACCESS_BOOL(InstallerOptions, kill, false);
-  API_ACCESS_BOOL(InstallerOptions, flash, false);
-  API_ACCESS_BOOL(InstallerOptions, startup, false);
-  API_ACCESS_BOOL(InstallerOptions, authenticated, false);
-  API_ACCESS_FUNDAMENTAL(InstallerOptions, u32, ram_size, 0);
-  API_ACCESS_FUNDAMENTAL(InstallerOptions, u32, access_mode, 0555);
-
-  // OS options
-  API_ACCESS_BOOL(InstallerOptions, verify, false);
-  API_ACCESS_BOOL(InstallerOptions, append_hash, false);
-  API_ACCESS_BOOL(InstallerOptions, reconnect, false);
-  API_ACCESS_COMPOUND(InstallerOptions, chrono::MicroTime, delay);
-  API_ACCESS_FUNDAMENTAL(InstallerOptions, u32, retry_reconnect_count, 50);
-
-  API_ACCESS_BOOL(InstallerOptions, insert_key, false);
-  API_ACCESS_COMPOUND(InstallerOptions, var::String, secret_key);
-
-  // thing options
-  API_ACCESS_BOOL(
-    InstallerOptions,
-    synchronize_thing,
-    false); // keep thing synchronized to actions
-  API_ACCESS_BOOL(
-    InstallerOptions,
-    rekey_thing,
-    false); // only valid if team is not empty
-
-public:
-  InstallerOptions() { set_delay(chrono::Milliseconds(500)); }
-};
-
-class InstallerAppUpdate {
-  API_ACCESS_COMPOUND(InstallerAppUpdate, var::String, path);
-  API_ACCESS_COMPOUND(InstallerAppUpdate, sys::AppfsInfo, info);
-
-public:
-  bool is_valid() const { return path().is_empty() == false; }
-};
-
 class Installer : public cloud::CloudObject {
 public:
-  explicit Installer(sys::Link *connection);
+  class Options {
 
-  bool install(const InstallerOptions &options);
+    // if id is provided -- download and install
+    API_ACCESS_COMPOUND(Options, var::StringView, project_id);
+    API_ACCESS_COMPOUND(Options, var::StringView, team_id);
+    API_ACCESS_COMPOUND(Options, var::StringView, url);
+    API_ACCESS_BOOL(Options, update_os, false);
+    API_ACCESS_BOOL(Options, update_apps, false);
 
-  API_ACCESS_FUNDAMENTAL(Installer, sys::Link *, connection, nullptr);
+    // update directories
+    API_ACCESS_COMPOUND(Options, var::StringView, update_app_directories);
+
+    // path is a path to a project
+    API_ACCESS_COMPOUND(Options, var::StringView, project_path);
+    API_ACCESS_COMPOUND(Options, var::StringView, version);
+    API_ACCESS_COMPOUND(Options, var::StringView, build_name);
+
+    // path to an image to install
+    API_ACCESS_COMPOUND(Options, var::StringView, binary_path);
+    API_ACCESS_BOOL(Options, application, false);
+    API_ACCESS_BOOL(Options, os, false);
+
+    API_ACCESS_COMPOUND(Options, var::StringView, build_path);
+
+    // application options
+    API_ACCESS_COMPOUND(Options, var::StringView, destination);
+    API_ACCESS_COMPOUND(Options, var::StringView, suffix);
+    API_ACCESS_COMPOUND(Options, var::StringView, architecture);
+    API_ACCESS_BOOL(Options, tightly_coupled_data, false);
+    API_ACCESS_BOOL(Options, tightly_coupled_code, false);
+    API_ACCESS_BOOL(Options, external_data, false);
+    API_ACCESS_BOOL(Options, external_code, false);
+    API_ACCESS_BOOL(Options, clean, false);
+    API_ACCESS_BOOL(Options, force, false);
+    API_ACCESS_BOOL(Options, kill, false);
+    API_ACCESS_BOOL(Options, flash, false);
+    API_ACCESS_BOOL(Options, startup, false);
+    API_ACCESS_BOOL(Options, authenticated, false);
+    API_ACCESS_FUNDAMENTAL(Options, u32, ram_size, 0);
+    API_ACCESS_FUNDAMENTAL(Options, u32, access_mode, 0555);
+
+    // OS options
+    API_ACCESS_BOOL(Options, verify, false);
+    API_ACCESS_BOOL(Options, append_hash, false);
+    API_ACCESS_BOOL(Options, reconnect, false);
+    API_ACCESS_COMPOUND(Options, chrono::MicroTime, delay);
+    API_ACCESS_FUNDAMENTAL(Options, u32, retry_reconnect_count, 50);
+
+    API_ACCESS_BOOL(Options, insert_key, false);
+    API_ACCESS_COMPOUND(Options, var::StringView, secret_key);
+
+    // thing options
+    API_ACCESS_BOOL(
+      Options,
+      synchronize_thing,
+      false); // keep thing synchronized to actions
+    API_ACCESS_BOOL(
+      Options,
+      rekey_thing,
+      false); // only valid if team is not empty
+
+  public:
+    Options() { set_delay(500_milliseconds); }
+  };
+
+  class AppUpdate {
+    API_ACCESS_COMPOUND(AppUpdate, var::StringView, path);
+    API_ACCESS_COMPOUND(AppUpdate, sos::Appfs::Info, info);
+
+  public:
+    bool is_valid() const { return path().is_empty() == false; }
+  };
+
+  explicit Installer(sos::Link *connection);
+
+  Installer &install(const Options &options);
 
   void print_transfer_info(
     const fs::File &image,
-    const chrono::Timer &transfer_timer);
+    const chrono::ClockTimer &transfer_timer);
 
 private:
-  API_ACCESS_COMPOUND(Installer, var::String, project_name);
-  API_ACCESS_COMPOUND(Installer, var::String, project_id);
-  API_ACCESS_COMPOUND(Installer, var::String, architecture);
+  API_ACCESS_FUNDAMENTAL(Installer, sos::Link *, connection, nullptr);
+  API_ACCESS_COMPOUND(Installer, var::StringView, project_name);
+  API_ACCESS_COMPOUND(Installer, var::StringView, project_id);
+  API_ACCESS_COMPOUND(Installer, var::StringView, architecture);
 
-  bool install_url(const InstallerOptions &options);
-  bool install_id(const InstallerOptions &options);
-  bool install_path(const InstallerOptions &options);
-  bool install_binary(const InstallerOptions &options);
+  bool install_url(const Options &options);
+  bool install_id(const Options &options);
+  bool install_path(const Options &options);
+  bool install_binary(const Options &options);
 
-  var::Vector<InstallerAppUpdate>
-  get_app_update_list(const InstallerOptions &options);
-  var::Vector<InstallerAppUpdate> get_app_update_list_from_directory(
-    const var::String &directory_path,
-    const InstallerOptions &options);
-  bool update_apps(
-    const var::Vector<InstallerAppUpdate> &app_list,
-    const InstallerOptions &options);
-  bool update_os(const InstallerOptions &options);
+  var::Vector<AppUpdate> get_app_update_list(const Options &options);
+  var::Vector<AppUpdate> get_app_update_list_from_directory(
+    const var::StringView directory_path,
+    const Options &options);
+  bool
+  update_apps(const var::Vector<AppUpdate> &app_list, const Options &options);
+  bool update_os(const Options &options);
 
-  bool import_build_from_project_path(const InstallerOptions &options);
+  bool import_build_from_project_path(const Options &options);
 
-  bool install_build(Build &build, const InstallerOptions &options);
+  bool install_build(Build &build, const Options &options);
 
-  bool install_application_build(Build &build, const InstallerOptions &options);
+  bool install_application_build(Build &build, const Options &options);
 
-  bool install_os_build(Build &build, const InstallerOptions &options);
+  bool install_os_build(Build &build, const Options &options);
 
   bool install_os_image(
     const Build &build,
     const fs::File &image,
-    const InstallerOptions &options);
+    const Options &options);
 
-  bool install_application_image(
-    const fs::File &image,
-    const InstallerOptions &options);
+  bool install_application_image(const fs::File &image, const Options &options);
 
   int save_image_locally(
     const Build &build,
     const fs::File &image,
-    const InstallerOptions &options);
+    const Options &options);
 
-  bool reconnect(const InstallerOptions &options);
+  bool reconnect(const Options &options);
 
   int kill_application(int app_pid);
   int clean_application();

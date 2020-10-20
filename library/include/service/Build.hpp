@@ -122,6 +122,10 @@ public:
       }
       return *this;
     }
+
+    bool operator==(const ImageInfo &info) const {
+      return get_name() == info.get_name();
+    }
   };
 
   class BuildOptions {
@@ -151,8 +155,13 @@ public:
   };
 
   class Construct {
+    API_AC(Construct, var::StringView, binary_path);
+    API_AC(Construct, var::StringView, project_path);
     API_AC(Construct, var::StringView, project_id);
     API_AC(Construct, var::StringView, build_id);
+    API_AC(Construct, var::StringView, build_name);
+    API_AC(Construct, var::StringView, architecture);
+    API_AC(Construct, var::StringView, url);
   };
 
   Build(const Construct &options);
@@ -169,9 +178,12 @@ public:
   bool is_data() const;
 
   class ImportCompiled {
-    API_ACCESS_COMPOUND(ImportCompiled, var::String, path);
-    API_ACCESS_COMPOUND(ImportCompiled, var::String, build);
-    API_ACCESS_COMPOUND(ImportCompiled, var::String, application_architecture);
+    API_ACCESS_COMPOUND(ImportCompiled, var::StringView, path);
+    API_ACCESS_COMPOUND(ImportCompiled, var::StringView, build);
+    API_ACCESS_COMPOUND(
+      ImportCompiled,
+      var::StringView,
+      application_architecture);
 
   public:
   };
@@ -206,11 +218,11 @@ public:
     return *this;
   }
 
-  Build &remove_other_build_images(const var::String &keep_name) {
+  Build &remove_other_build_images(const var::StringView keep_name) {
     var::Vector<ImageInfo> build_list = build_image_list();
     var::Vector<ImageInfo> updated_build_list;
     for (ImageInfo &image_info : build_list) {
-      if (image_info.get_name() == normalize_name(keep_name)) {
+      if (image_info.get_name() == normalize_name(keep_name).string_view()) {
         updated_build_list.push_back(image_info);
       }
     }
@@ -246,24 +258,30 @@ public:
            || to_object().at(("buildIncludesImage")).to_bool();
   }
 
-  int download(const var::String &url);
+  Build &import_url(const var::StringView url);
   int download(const BuildOptions &options);
 
-  var::Data get_image(const var::String &name) const;
-  Build &set_image(const var::String &name, const var::Data &image);
+  var::Data get_image(const var::StringView name) const;
+  Build &set_image(const var::StringView name, const var::Data &image);
 
-  var::String normalize_name(const var::StringView build_name) const;
+  fs::Path normalize_name(const var::StringView build_name) const;
 
-  var::String upload(const BuildOptions &options);
+  class Save {
+    API_AC(Save, var::StringView, project_id);
+  };
+
+  Build &save(const Save &options);
+  inline Build &operator()(const Save &options) { return save(options); }
+  using DocumentAccess<Build>::save;
 
   static Type decode_build_type(const var::StringView type);
   static var::StringView encode_build_type(Type type);
 
   Type decode_build_type() const;
 
-  Build &set_application_architecture(const var::String &value) {
+  Build &set_application_architecture(const var::StringView value) {
     if (decode_build_type() == Type::application) {
-      m_application_architecture = value;
+      m_application_architecture = var::String(value);
     }
     return *this;
   }
@@ -276,12 +294,22 @@ private:
     API_ACCESS_COMPOUND(SectionPathInfo, var::String, path);
   };
 
-  var::String
+  Document::Path create_storage_path(const var::StringView build_name) const {
+    return Document::Path()
+      .append("builds/")
+      .append(get_project_id())
+      .append("/")
+      .append(get_document_id())
+      .append("/")
+      .append(build_name);
+  }
+
+  fs::Path
   get_build_file_path(const var::StringView path, const var::StringView build);
 
   var::Vector<SectionPathInfo> get_section_image_path_list(
-    const var::String &path,
-    const var::String &build);
+    const var::StringView path,
+    const var::StringView build);
 
   var::String calculate_hash(var::Data &image);
   void migrate_build_info_list_20200518();

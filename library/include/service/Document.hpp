@@ -65,13 +65,17 @@ protected:
   const Document &
   export_base64_to_binary_file(var::StringView path, const char *key) const;
 
-  virtual void interface_import_file(const fs::File &file);
-  virtual void interface_export_file(const fs::File &file) const;
+  void interface_import_file(const fs::File &file);
+  void interface_export_file(const fs::File &file) const;
   virtual void interface_save();
 
 private:
   Path m_path;
   Id m_id;
+
+  Path get_path_with_id() const {
+    return Path(path()).append("/").append(id());
+  }
 
   void convert_tags_to_list();
   void sanitize_tag_list();

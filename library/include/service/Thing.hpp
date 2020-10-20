@@ -7,14 +7,6 @@
 
 namespace service {
 
-class ThingOptions : public DocumentOptionsAccess<ThingOptions> {
-public:
-  ThingOptions() { set_path("things"); }
-
-private:
-};
-
-
 /*!
  * \brief Thing class
  * \details The Thing class refers to the Things
@@ -28,14 +20,16 @@ public:
   public:
     JSON_ACCESS_CONSTRUCT_OBJECT(SystemInformation);
 
-    explicit SystemInformation(const sys::SysInfo &info)
+    explicit SystemInformation(const sos::Sys::Info &info)
       : JsonValue(json::JsonObject()) {
       set_application_signature(
-        var::String::number(info.application_signature(), "0x%08X"));
+        var::NumberString(info.application_signature(), "0x%08X")
+          .string_view());
       set_architecture(info.cpu_architecture());
       set_bsp_git_hash(info.bsp_git_hash());
       set_cpu_frequency(info.cpu_frequency());
-      set_hardware_id(var::String::number(info.hardware_id(), "0x%08X"));
+      set_hardware_id(
+        var::NumberString(info.hardware_id(), "0x%08X").string_view());
       set_mcu_git_hash(info.mcu_git_hash());
       set_name(info.name());
       set_project_id(info.id());

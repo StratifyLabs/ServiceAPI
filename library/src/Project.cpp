@@ -203,8 +203,7 @@ int Project::publish_build(const ProjectOptions &options) {
   return 0;
 }
 
-bool Project::is_build_version_valid(
-  const var::VersionString &build_version) const {
+bool Project::is_build_version_valid(const sys::Version &build_version) const {
 
   JsonKeyValueList<ProjectBuildItem> list = build_list();
   if (list.count() == 0) {
@@ -257,7 +256,7 @@ Build Project::download_build(const var::String &version) const {
   return result;
 }
 
-var::String Project::get_build_id(const var::String &version) const {
+var::String Project::get_build_id(const var::StringView version) const {
 
   VersionString latest_version;
   JsonKeyValueList<ProjectBuildItem> list = build_list();

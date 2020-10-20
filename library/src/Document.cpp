@@ -40,13 +40,7 @@ Document::Document(const var::StringView path, const Id &id) {
   }
 }
 
-Document::Document(const fs::File &file) {
-  to_object() = JsonDocument().load(file);
-}
-
-var::String Document::save_to_cloud() {
-
-  DocumentOptions updated_options(options);
+void Document::interface_save() {
 
   set_timestamp(DateTime::get_system_time().ctime());
   set_user_id(cloud().credentials().get_uid_cstring());
@@ -63,30 +57,27 @@ var::String Document::save_to_cloud() {
     get_permissions() == "public" || get_permissions() == "private"
     || get_permissions() == "searchable");
 
-  if (options.document_id().is_empty() || options.is_create()) {
-    // if id.is_empty() then we add a new document to path otherwise modify a
-    // document
+  const bool is_create = id().is_empty();
+
+  if (id().is_empty()) {
 
     const var::String result = cloud().create_document(
-      options.create_parent_path(),
+      path().string_view(),
       to_object(),
-      options.document_id());
+      id().string_view());
 
     if (result != "") {
       // once document is uploaded it should be modified to include the id
-      set_document_id(result.cstring());
-      updated_options.set_document_id(result);
+      set_document_id(result);
     } else {
       JsonObject error
         = JsonDocument().from_string(cloud().document_error()).to_object();
-
       if (
-        error.at(("error")).to_object().at(("status")).to_string()
+        error.at("error").to_object().at("status").to_string()
         == "ALREADY_EXISTS") {
 
       } else {
-
-        return String();
+        return;
       }
     }
   }
@@ -98,22 +89,18 @@ var::String Document::save_to_cloud() {
   for (const auto &key : key_list) {
     cloud().document_update_mask_fields().push_back(String(key.cstring()));
   }
-  set_document_id(updated_options.document_id().cstring());
-  cloud().patch_document(updated_options.create_full_path(), to_object());
-
-  return updated_options.document_id();
+  set_document_id(id());
+  cloud().patch_document(get_path_with_id().string_view(), to_object());
+  return;
 }
 
-Document &Document::load(var::StringView path) {
-  to_object() = JsonDocument().load(path);
+void Document::interface_import_file(const fs::File &file) {
+  to_object() = JsonDocument().load(file);
   convert_tags_to_list(); // tags -> tagList
-  return *this;
 }
 
-Document &Document::save(var::StringView path) {
-  convert_tags_to_list(); // tags -> tagList
-  JsonDocument().save(*this, File(File::IsOverwrite::yes, path));
-  return *this;
+void Document::interface_export_file(const fs::File &file) const {
+  JsonDocument().save(*this, file);
 }
 
 Document &
@@ -141,7 +128,7 @@ void Document::convert_tags_to_list() {
 
 void Document::sanitize_tag_list() {
   var::StringViewList list = get_tag_list();
-  var::StringList sanitized_list;
+  var::StringViewList sanitized_list;
 
   for (const auto &item : list) {
     bool is_present = false;
