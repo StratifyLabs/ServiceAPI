@@ -98,43 +98,43 @@ private:
   API_ACCESS_COMPOUND(Installer, var::StringView, project_id);
   API_ACCESS_COMPOUND(Installer, var::StringView, architecture);
 
-  bool install_url(const Options &options);
-  bool install_id(const Options &options);
-  bool install_path(const Options &options);
-  bool install_binary(const Options &options);
+  void install_url(const Options &options);
+  void install_id(const Options &options);
+  void install_path(const Options &options);
+  void install_binary(const Options &options);
 
   var::Vector<AppUpdate> get_app_update_list(const Options &options);
   var::Vector<AppUpdate> get_app_update_list_from_directory(
     const var::StringView directory_path,
     const Options &options);
-  bool
+  void
   update_apps(const var::Vector<AppUpdate> &app_list, const Options &options);
-  bool update_os(const Options &options);
+  void update_os(const Options &options);
 
-  bool import_build_from_project_path(const Options &options);
+  void import_build_from_project_path(const Options &options);
 
-  bool install_build(Build &build, const Options &options);
+  void install_build(Build &build, const Options &options);
 
-  bool install_application_build(Build &build, const Options &options);
+  void install_application_build(Build &build, const Options &options);
 
-  bool install_os_build(Build &build, const Options &options);
+  void install_os_build(Build &build, const Options &options);
 
-  bool install_os_image(
+  void install_os_image(
     const Build &build,
     const fs::File &image,
     const Options &options);
 
-  bool install_application_image(const fs::File &image, const Options &options);
+  void install_application_image(const fs::File &image, const Options &options);
 
-  int save_image_locally(
+  void save_image_locally(
     const Build &build,
     const fs::File &image,
     const Options &options);
 
-  bool reconnect(const Options &options);
+  void reconnect(const Options &options);
 
-  int kill_application(int app_pid);
-  int clean_application();
+  void kill_application(int app_pid);
+  void clean_application();
 };
 
 } // namespace service

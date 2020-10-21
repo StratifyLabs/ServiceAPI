@@ -33,7 +33,7 @@ public:
       set_mcu_git_hash(info.mcu_git_hash());
       set_name(info.name());
       set_project_id(info.id());
-      set_serial_number(info.serial_number().to_string());
+      set_serial_number(info.serial_number().to_string().string_view());
       set_sos_git_hash(info.sos_git_hash());
       set_team_id(info.team_id());
       set_version(info.system_version());

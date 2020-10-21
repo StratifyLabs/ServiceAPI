@@ -7,12 +7,6 @@
 
 namespace service {
 
-class ReportOptions : public DocumentOptionsAccess<ReportOptions> {
-public:
-  ReportOptions() { set_path("reports"); }
-
-  API_AF(ReportOptions, const fs::File *, file, nullptr);
-};
 
 class Report : public DocumentAccess<Report> {
 public:
@@ -33,7 +27,7 @@ public:
 
   Path get_storage_path() const {
     API_ASSERT(!id().is_empty());
-    return Path("reports/").append(id().cstring()).append(".md");
+    return (Path("reports") / id()).append(".md");
   }
 };
 

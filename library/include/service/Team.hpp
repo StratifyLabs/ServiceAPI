@@ -10,10 +10,7 @@ public:
   class User : public DocumentAccess<User> {
   public:
     User(const Id &team, const Id &id = "")
-      : DocumentAccess(Path("teams/")
-                         .append(team.cstring())
-                         .append("/")
-                         .append(id.cstring())) {}
+      : DocumentAccess(Path("teams") / team / id, id) {}
 
     JSON_ACCESS_BOOL(User, create);
     JSON_ACCESS_BOOL(User, remove);

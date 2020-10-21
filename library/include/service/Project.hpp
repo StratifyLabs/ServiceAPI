@@ -113,7 +113,7 @@ public:
 
   bool is_build_version_valid(const sys::Version &build_version) const;
 
-  var::String get_build_id(const var::StringView version) const;
+  Id get_build_id(const var::StringView version) const;
 
   bool is_update_available(const var::String &current_version);
 
@@ -144,7 +144,7 @@ public:
   json::JsonArray list();
 
 private:
-  var::String get_storage_path(const PublishBuild &options) const;
+  Path get_storage_path(const PublishBuild &options) const;
 
   int compare(const sys::Version &version) const;
 };

@@ -12,7 +12,29 @@ namespace service {
 class Document : public cloud::CloudAccess, public json::JsonValue {
 public:
   using Id = var::StackString32;
-  using Path = var::StackString256;
+
+  class Path : public var::StackStringObject<Path, 256> {
+  public:
+    Path() {}
+    Path(const char *a) : var::StackStringObject<Path, 256>(a) {}
+    Path(const var::StringView a) : var::StackStringObject<Path, 256>(a) {}
+    Path(const var::String &a)
+      : var::StackStringObject<Path, 256>(a.cstring()) {}
+
+    Path &operator/(const char *a) { return append("/").append(a); }
+    Path &operator/(const Id &a) { return append("/").append(a.cstring()); }
+    Path &operator/(const Path &a) { return append("/").append(a.cstring()); }
+    Path &operator/(const var::StringView a) { return append("/").append(a); }
+    Path &operator/(const var::String &a) {
+      return append("/").append(a.cstring());
+    }
+
+    // implicit conversion
+    operator const char *() const { return m_buffer; }
+    operator const var::StringView() {
+      return std::move(var::StringView(m_buffer));
+    }
+  };
 
   class Tag {
   public:
@@ -98,7 +120,7 @@ public:
   DocumentAccess(const var::StringView document_path, const Id &id)
     : Document(document_path, id) {}
 
-  Derived &export_file(const fs::File &a) const {
+  Derived &export_file(const fs::File &a) {
     Document::interface_export_file(a);
     return static_cast<Derived &>(*this);
   }
@@ -113,10 +135,18 @@ public:
     return static_cast<Derived &>(*this);
   }
 
-  API_WRITE_ACCESS_COMPOUND_ALIAS(Document, Derived, var::String, document_id)
-  API_WRITE_ACCESS_COMPOUND_ALIAS(Document, Derived, var::String, team_id)
-  API_WRITE_ACCESS_COMPOUND_ALIAS(Document, Derived, var::String, user_id)
-  API_WRITE_ACCESS_COMPOUND_ALIAS(Document, Derived, var::String, permissions)
+  API_WRITE_ACCESS_COMPOUND_ALIAS(
+    Document,
+    Derived,
+    var::StringView,
+    document_id)
+  API_WRITE_ACCESS_COMPOUND_ALIAS(Document, Derived, var::StringView, team_id)
+  API_WRITE_ACCESS_COMPOUND_ALIAS(Document, Derived, var::StringView, user_id)
+  API_WRITE_ACCESS_COMPOUND_ALIAS(
+    Document,
+    Derived,
+    var::StringView,
+    permissions)
   API_WRITE_ACCESS_COMPOUND_ALIAS(Document, Derived, var::StringList, tag_list)
   API_WRITE_ACCESS_FUNDAMENTAL_ALIAS(Document, Derived, s32, timestamp)
 };

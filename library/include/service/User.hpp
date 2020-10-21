@@ -9,21 +9,16 @@ class User : public DocumentAccess<User> {
 public:
   class AdminProfile : public DocumentAccess<AdminProfile> {
   public:
-    AdminProfile(cloud::Cloud &cloud, const Id &id)
-      : DocumentAccess(
-        Path("users/").append(id.cstring()).append("/profile"),
-        Id("admin")) {}
+    AdminProfile(const Id &id)
+      : DocumentAccess(Path("users") / id / "profile", Id("admin")) {}
 
     JSON_ACCESS_STRING(AdminProfile, account);
   };
 
   class PublicProfile : public DocumentAccess<PublicProfile> {
   public:
-    PublicProfile(cloud::Cloud &cloud, const Id &id)
-      : DocumentAccess(
-        cloud,
-        Path("users/").append(id.cstring()).append("/profile"),
-        Id("public")) {}
+    PublicProfile(const Id &id)
+      : DocumentAccess(Path("users") / id / "profile", Id("public")) {}
 
     JSON_ACCESS_STRING(PublicProfile, email);
     JSON_ACCESS_STRING(PublicProfile, interests);
@@ -36,11 +31,8 @@ public:
 
   class PrivateProfile : public DocumentAccess<PrivateProfile> {
   public:
-    PrivateProfile(cloud::Cloud &cloud, const Id &id)
-      : DocumentAccess(
-        cloud,
-        Path("users/").append(id.cstring()).append("/profile"),
-        Id("private")) {}
+    PrivateProfile(const Id &id)
+      : DocumentAccess(Path("users") / id / "/profile", Id("private")) {}
 
     JSON_ACCESS_BOOL_WITH_KEY(PrivateProfile, isEmailPublic, email_public);
     JSON_ACCESS_BOOL_WITH_KEY(
@@ -59,9 +51,6 @@ public:
   };
 
   User(const Id &id);
-  int download(const var::String &id) {
-    return Document::download(UserOptions().set_document_id(id));
-  }
 
   JSON_ACCESS_STRING_WITH_KEY(User, displayName, display_name);
   JSON_ACCESS_STRING(User, email);

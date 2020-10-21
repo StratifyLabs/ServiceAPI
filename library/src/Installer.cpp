@@ -1,5 +1,6 @@
-﻿#include <chrono.hpp>
+#include <chrono.hpp>
 #include <fs.hpp>
+#include <json.hpp>
 #include <printer.hpp>
 #include <sos.hpp>
 #include <var.hpp>
@@ -25,18 +26,14 @@ Installer &Installer::install(const Options &options) {
                                               : Vector<AppUpdate>();
 
   if (options.is_update_os()) {
-    if (
-      update_os(Options(options).set_reconnect(
-        options.is_reconnect() || options.is_update_apps()))
-      == false) {
-      return *this;
-    }
+    update_os(Options(options).set_reconnect(
+      options.is_reconnect() || options.is_update_apps()));
 
-    if (options.is_update_apps() == false) {
-      return *this;
-    } else {
-      // need to reconnect
+    options.is_update_apps();
+    if (is_success()) {
+      // reconnect
     }
+    return *this;
   }
 
   if (options.is_update_apps()) {
@@ -67,12 +64,12 @@ Installer &Installer::install(const Options &options) {
   return *this;
 }
 
-bool Installer::install_url(const Options &options) {
+void Installer::install_url(const Options &options) {
   Build b = Build(Build::Construct().set_url(options.url()));
   return install_build(b, options);
 }
 
-bool Installer::install_id(const Options &options) {
+void Installer::install_id(const Options &options) {
   Project p(Project::Id(options.project_id()));
   set_project_name(p.get_name());
   set_project_id(p.get_document_id());
@@ -89,7 +86,7 @@ bool Installer::install_id(const Options &options) {
   return install_build(b, options);
 }
 
-bool Installer::install_binary(const Options &options) {
+void Installer::install_binary(const Options &options) {
 
   if (fs::Path(options.binary_path()).suffix() == "json") {
     Build b = Build(Build::Construct().set_binary_path(options.binary_path()));
@@ -103,24 +100,22 @@ bool Installer::install_binary(const Options &options) {
     Appfs::Info source_image_info = Appfs().get_info(options.binary_path());
 
     if (source_image_info.is_valid() == false) {
-      API_RETURN_VALUE_ASSIGN_ERROR(false, "invalid image", EINVAL);
-      return false;
+      API_RETURN_ASSIGN_ERROR("invalid image", EINVAL);
     }
 
     set_project_name(source_image_info.name());
     set_project_id(source_image_info.id());
 
-    return install_application_image(image, options);
+    install_application_image(image, options);
+    return;
   }
 
   if (options.is_os()) {
     return install_os_image(Build(Build::Construct()), image, options);
   }
-
-  return false;
 }
 
-bool Installer::install_path(const Options &options) {
+void Installer::install_path(const Options &options) {
   Build b(Build::Construct()
             .set_project_path(options.project_path())
             .set_build_name(options.build_name())
@@ -132,14 +127,14 @@ bool Installer::install_path(const Options &options) {
   if (
     b.decode_build_type() == Build::Type::application
     && !options.is_application()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(false, "app type mismatch", false);
+    API_RETURN_ASSIGN_ERROR("app type mismatch", false);
   }
 
   if (b.decode_build_type() == Build::Type::os && !options.is_os()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(false, "os type mismatch", false);
+    API_RETURN_ASSIGN_ERROR("os type mismatch", false);
   }
 
-  return install_build(b, options);
+  install_build(b, options);
 }
 
 var::Vector<Installer::AppUpdate>
@@ -161,7 +156,7 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
     = FileSystem(connection()->driver()).read_directory(Dir(directory_path));
 
   for (const auto item : directory_list) {
-    fs::Path full_path = fs::Path(directory_path).append("/").append(item);
+    fs::Path full_path = fs::Path(directory_path) / item;
     Appfs::Info info = Appfs(connection()->driver()).get_info(full_path);
 
     if (info.is_valid()) {
@@ -173,7 +168,7 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
   return result;
 }
 
-bool Installer::update_apps(
+void Installer::update_apps(
   const var::Vector<AppUpdate> &app_list,
   const Options &options) {
   for (const AppUpdate &app : app_list) {
@@ -194,15 +189,13 @@ bool Installer::update_apps(
         "update",
         String(app_project.get_version()) + " from "
           + current_version.string_view());
-      if (
-        install_id(Options(options)
-                     .set_os(false)
-                     .set_application()
-                     .set_project_id(app_project.get_document_id())
-                     .set_team_id(app_project.get_team_id()))
-        == false) {
-        return false;
-      }
+
+      install_id(Options(options)
+                   .set_os(false)
+                   .set_application()
+                   .set_project_id(app_project.get_document_id())
+                   .set_team_id(app_project.get_team_id()));
+
     } else {
       printer().key("currentVersion", current_version.string_view());
       printer().key("latestVersion", app_project.get_version());
@@ -215,11 +208,9 @@ bool Installer::update_apps(
   if (app_list.count() == 0) {
     printer().key("update", "no apps available to check for updates");
   }
-
-  return true;
 }
 
-bool Installer::update_os(const Options &options) {
+void Installer::update_os(const Options &options) {
 
   Project os_project(Project::Id(connection()->sys_info().id()));
 
@@ -251,52 +242,43 @@ bool Installer::update_os(const Options &options) {
       "update",
       current_version.string_view() + " is the latest version");
   }
-
-  return true;
 }
 
-bool Installer::install_build(Build &build, const Options &options) {
+void Installer::install_build(Build &build, const Options &options) {
 
   if (build.decode_build_type() == Build::Type::application) {
-    CLOUD_PRINTER_TRACE("installing application build");
-    return install_application_build(build, options);
+    install_application_build(build, options);
+    return;
   }
 
   if (build.decode_build_type() == Build::Type::os) {
-    CLOUD_PRINTER_TRACE("installing OS build");
-    return install_os_build(build, options);
+    install_os_build(build, options);
+    return;
   }
-
-  set_error_message("cannot install build of type `" + build.get_type() + "`");
-  return false;
 }
 
-bool Installer::install_application_build(
+void Installer::install_application_build(
   Build &build,
   const Options &options) {
 
-  CLOUD_PRINTER_TRACE("load image for " + options.build_name());
   DataFile image(OpenMode::read_write());
   image.data() = build.get_image(options.build_name());
 
-  if (image.data().size() == 0) {
-    set_error_message(
-      "can't install build with name `"
-      + build.normalize_name(options.build_name()) + "`");
-    CLOUD_PRINTER_TRACE("image not found for " + options.build_name());
-    return false;
+  if (image.size() == 0) {
+    API_RETURN_ASSIGN_ERROR("", EINVAL);
   }
 
   printer().key(
     "build",
     build.normalize_name(options.build_name()).string_view());
   printer().key("version", build.get_version());
-  return install_application_image(
+
+  install_application_image(
     image,
     Options(options).set_version(build.get_version()));
 }
 
-bool Installer::install_os_build(Build &build, const Options &options) {
+void Installer::install_os_build(Build &build, const Options &options) {
 
   // insert secret key
   if (options.is_insert_key()) {
@@ -326,11 +308,7 @@ bool Installer::install_os_build(Build &build, const Options &options) {
       Thing thing(connection()->sys_info());
       if (thing.is_error()) {
         // no thing there
-        API_RETURN_VALUE_ASSIGN_ERROR(
-          false,
-          "secret key not accessible",
-          EPERM);
-        return false;
+        API_RETURN_ASSIGN_ERROR("secret key not accessible", EPERM);
       }
 
       existing_secret_key = thing.get_secret_key();
@@ -364,13 +342,11 @@ bool Installer::install_os_build(Build &build, const Options &options) {
       build.export_file(File(File::IsOverwrite::yes, link_path.path()));
 
       printer().key("destination", link_path.path_description());
-      return true;
+      return;
     } else {
-      API_RETURN_VALUE_ASSIGN_ERROR(
-        false,
+      API_RETURN_ASSIGN_ERROR(
         "cannot save JSON export to device (use `host@` prefix)",
         EINVAL);
-      return false;
     }
   }
 
@@ -383,13 +359,13 @@ bool Installer::install_os_build(Build &build, const Options &options) {
 
   printer().key("version", build.get_version());
 
-  bool result = install_os_image(
+  install_os_image(
     build,
     image,
     Options(options).set_reconnect(
       options.is_reconnect() || options.is_synchronize_thing()));
 
-  if (result && options.is_synchronize_thing()) {
+  if (is_success() && options.is_synchronize_thing()) {
     // update the thing with the new version that is installed
     PrinterObject po(printer(), "thing");
 
@@ -407,73 +383,50 @@ bool Installer::install_os_build(Build &build, const Options &options) {
       thing.save();
     }
   }
-
-  return result;
 }
 
-bool Installer::install_application_image(
+void Installer::install_application_image(
   const fs::File &image,
   const Options &options) {
 
-
   {
-    int result;
+    save_image_locally(
+      Build(Build::Construct()),
+      image,
+      Options(options).set_application());
 
-    result
-      = save_image_locally(Build(), image, Options(options).set_application());
-
-    if (result >= 0) {
-      return result;
+    if (is_error()) {
+      return;
     }
   }
 
-  int app_pid = connection()->get_pid(project_name());
-  CLOUD_PRINTER_TRACE("pid is " + String::number(app_pid));
+  int app_pid = sos::TaskManager().get_pid(project_name());
   if (options.is_kill()) {
     if (app_pid > 0) {
       printer().key("kill", project_name());
-      if (kill_application(app_pid) < 0) {
-        return false;
-      }
-    } else {
-      CLOUD_PRINTER_TRACE(project_name() + " is not running");
+      kill_application(app_pid);
     }
   } else {
     if (app_pid > 0 && !options.is_force()) {
-      set_error_message(project_name() + " is currently running");
-      set_error_message(
-        "`sl` cannot install an application "
-        "if the application is currently executing. "
-        "If you specifiy `kill=true` when installing, "
-        "the application will be sent a kill signal "
-        "as part of the installation.");
-      CLOUD_PRINTER_TRACE("application is already running");
-      return false;
+      return;
     }
   }
 
   if (options.is_clean()) {
-    CLOUD_PRINTER_TRACE("clean");
     clean_application();
   }
 
-  bool is_flash_available;
+  const bool is_flash_available
+    = options.is_flash() ? Appfs(connection()->driver()).is_flash_available()
+                         : false;
 
-  if (options.is_flash()) {
-    is_flash_available
-      = Appfs::is_flash_available(fs::File::LinkDriver(connection()->driver()));
-  } else {
-    is_flash_available = false;
+  if (is_error()) {
+    return;
   }
 
-  CLOUD_PRINTER_TRACE(
-    is_flash_available ? String("Flash is available")
-                       : String("Flash not available"));
+  sys::Version version(options.version());
 
-  sys::Version version;
-  version.string() = options.version();
-
-  AppfsFileAttributes attributes;
+  Appfs::FileAttributes attributes;
   attributes.set_name(project_name() + options.suffix())
     .set_id(project_id())
     .set_startup(options.is_startup())
@@ -485,120 +438,95 @@ bool Installer::install_application_image(
     .set_ram_size(options.ram_size())
     .set_authenticated(options.is_authenticated())
     .set_access_mode(options.access_mode())
-    .set_version(version.to_bcd16());
+    .set_version(version.to_bcd16())
+    .apply(image);
 
   {
     PrinterObject po(printer(), "appfsAttributes");
     printer().key("name", attributes.name());
-    printer().key("version", version.string());
+    printer().key("version", version.string_view());
     printer().key("id", attributes.id());
-    printer().key("flash", attributes.is_flash());
-    printer().key("startup", attributes.is_startup());
-    printer().key("externalcode", attributes.is_code_external());
-    printer().key("externaldata", attributes.is_data_external());
-    printer().key(
+    printer().key_bool("flash", attributes.is_flash());
+    printer().key_bool("startup", attributes.is_startup());
+    printer().key_bool("externalcode", attributes.is_code_external());
+    printer().key_bool("externaldata", attributes.is_data_external());
+    printer().key_bool(
       "tightlycoupledcode",
       attributes.is_code_tightly_coupled() != 0);
-    printer().key(
+    printer().key_bool(
       "tightlycoupleddata",
       attributes.is_data_tightly_coupled() != 0);
-    printer().key("authenticated", attributes.is_authenticated());
+    printer().key_bool("authenticated", attributes.is_authenticated());
     if (attributes.ram_size() == 0) {
       printer().key("ramsize", String("<default>"));
     } else {
-      printer().key("ramsize", String::number(attributes.ram_size()));
+      printer().key(
+        "ramsize",
+        NumberString(attributes.ram_size()).string_view());
     }
   }
 
-  if (attributes.apply(image) < 0) {
-    set_error_message("failed to apply file attributes to image");
-    return -1;
+  if (connection()->is_connected() == false) {
+    API_RETURN_ASSIGN_ERROR("not connected", EIO);
   }
 
-  if (connection()->is_connected()) {
-    CLOUD_PRINTER_TRACE("Is connected");
-  } else {
-    set_error_message("Not connected");
-    return false;
-  }
-
-  String destination
-    = options.destination().is_empty() ? String("/app") : options.destination();
-
-  Timer transfer_timer;
   printer().progress_key() = "installing";
+  chrono::ClockTimer transfer_timer;
   transfer_timer.start();
-  int result = connection()->install_app(
-    image,
-    fs::File::Path(destination),
-    sos::Link::ApplicationName(attributes.name()),
-    printer().progress_callback());
+  sos::Appfs(Appfs::Construct()
+               .set_executable(true)
+               .set_overwrite(true)
+               .set_mount(
+                 options.destination().is_empty() ? fs::Path("/app")
+                                                  : options.destination())
+               .set_name(attributes.name()))
+    .append(image, printer().progress_callback());
   transfer_timer.stop();
   printer().progress_key() = "progress";
 
-  if (result < 0) {
-    set_error_message(
-      "Failed to install application " + connection()->error_message());
-    return false;
+  if (is_success()) {
+    print_transfer_info(image, transfer_timer);
   }
-  print_transfer_info(image, transfer_timer);
-  return true;
+
+  return;
 }
 
-bool Installer::install_os_image(
+void Installer::install_os_image(
   const Build &build,
   const File &image,
   const Options &options) {
-  int result;
 
-  result = save_image_locally(build, image, Options(options).set_os());
-
-  if (result >= 0) {
-    return result;
-  }
-
+  save_image_locally(build, image, Options(options).set_os());
   PrinterObject po(printer(), "bootloader");
   {
     if (!connection()->is_bootloader()) {
 
       // bootloader must be invoked
-      CLOUD_PRINTER_TRACE("invoking bootloader");
-      result = connection()->reset_bootloader();
-      if (result < 0) {
-        set_error_message("Failed to invoke the bootloader");
-        set_error_message(
-          "Failed to invoke bootloader with connnection"
-          " error message "
-          + connection()->error_message());
-
-        return false;
-      }
-
-      CLOUD_PRINTER_TRACE(
-        "waiting " + String::number(options.delay().milliseconds()) + "ms");
-      options.delay().wait();
-
+      connection()->reset_bootloader();
+      chrono::wait(options.delay());
       // now reconnect to the device
       reconnect(options);
     }
 
-    CLOUD_PRINTER_TRACE("Installing OS");
-    Timer transfer_timer;
+    if (is_error()) {
+      return;
+    }
+
+    ClockTimer transfer_timer;
     printer().progress_key() = "installing";
     transfer_timer.start();
-    result = connection()->update_os(
-      image,
-      sos::Link::IsVerify(options.is_verify()),
-      printer(),
-      sos::Link::BootloaderRetryCount(options.retry_reconnect_count()));
+    connection()->update_os(
+      Link::UpdateOs()
+        .set_image(&image)
+        .set_bootloader_retry_count(options.retry_reconnect_count())
+        .set_printer(&printer())
+        .set_verify(options.is_verify()));
+
     transfer_timer.stop();
     printer().progress_key() = "progress";
-    if (result < 0) {
-      CLOUD_PRINTER_TRACE(String().format(
-        "failed to install with return value %d -> %s",
-        result,
-        connection()->error_message().cstring()));
-      return false;
+
+    if (is_error()) {
+      return;
     }
 
     print_transfer_info(image, transfer_timer);
@@ -608,7 +536,7 @@ bool Installer::install_os_image(
         "Failed to reset the OS with connection error "
         "message: "
         + connection()->error_message());
-      return false;
+      return;
     }
   }
 
@@ -616,10 +544,10 @@ bool Installer::install_os_image(
     reconnect(options);
   }
 
-  return true;
+  return;
 }
 
-bool Installer::reconnect(const Options &options) {
+void Installer::reconnect(const Options &options) {
   CLOUD_PRINTER_TRACE(String().format(
     "reconnect %d retries at %dms intervals",
     options.retry_reconnect_count(),
@@ -627,46 +555,40 @@ bool Installer::reconnect(const Options &options) {
 
   printer().progress_key() = "reconnecting";
   for (u32 i = 0; i < options.retry_reconnect_count(); i++) {
-    if (
-      connection()->reconnect(
-        sos::Link::RetryCount(1),
-        sos::Link::RetryDelay(options.delay()))
-      == 0) {
+    if (connection()->reconnect(1, options.delay()) == 0) {
       break;
     }
     printer().update_progress(
       static_cast<int>(i),
-      ProgressCallback::indeterminate_progress_total());
+      api::ProgressCallback::indeterminate_progress_total());
   }
   if (connection()->is_connected() == false) {
-    set_error_message("failed to reconnect: " + connection()->error_message());
-    return false;
+    return;
   }
 
   printer().update_progress(0, 0);
   printer().progress_key() = "progress";
-  return true;
 }
 
-int Installer::save_image_locally(
+void Installer::save_image_locally(
   const Build &build,
   const fs::File &image,
   const Options &options) {
   if (!options.destination().is_empty()) {
     CLOUD_PRINTER_TRACE("saving image to " + options.destination());
     String destination;
-    LinkPath link_path(options.destination(), connection()->driver());
+    Link::Path link_path(options.destination(), connection()->driver());
 
     if (link_path.is_host_path()) {
 
-      FileInfo info = File::get_info(link_path.path());
+      FileInfo info = FileSystem().get_info(link_path.path());
 
       if (link_path.path().is_empty() || info.is_directory()) {
         // if directory do <dir>/<project>_<build_name> with .bin for os images
         destination
           = (link_path.path().is_empty() ? String() : (link_path.path() + "/"))
             + project_name() + "_"
-            + Build()
+            + Build(Build::Construct())
                 .set_type(
                   options.is_os() ? Build::os_type()
                                   : Build::application_type())
@@ -678,107 +600,80 @@ int Installer::save_image_locally(
         destination = link_path.path();
       }
 
-      if (image.save_copy(destination, File::IsOverwrite(true)) < 0) {
-        set_error_message(
-          "failed to create destination"
-          "file "
-          + destination);
-        return 0;
-      }
+      File(File::IsOverwrite::yes, destination).write(image);
+
       printer().key("image", "host@" + destination);
 
-      JsonKeyValueList<BuildSectionImageInfo> section_image_info
+      JsonKeyValueList<Build::SectionImageInfo> section_image_info
         = build.build_image_info(options.build_name()).get_section_list();
 
-      for (const BuildSectionImageInfo &image_info : section_image_info) {
-        String section_destination = FileInfo::no_suffix(destination);
-        section_destination += "." + image_info.key() + ".bin";
+      for (const Build::SectionImageInfo &image_info : section_image_info) {
+        fs::Path section_destination(fs::Path(destination).no_suffix());
+
+        section_destination.append(".").append(image_info.key()).append(".bin");
         printer().key(image_info.key(), "host@" + section_destination);
 
-        if (
-          image_info.get_image_data().save(
-            section_destination,
-            Reference::IsOverwrite(true))
-          < 0) {
-          printer().warning(
-            "failed to save section binary " + section_destination);
-        }
+        File(File::IsOverwrite::yes, section_destination)
+          .write(image_info.get_image_data());
       }
-
-      return 1;
-    } else {
-      if (options.is_os()) {
-        set_error_message(
-          "cannot write the os directly to the"
-          "device filesystem at "
-          + link_path.path_description());
-        return 0;
-      }
-
-      return -1;
     }
   }
-  return -1;
 }
 
-int Installer::kill_application(int app_pid) {
+void Installer::kill_application(int app_pid) {
+  API_ASSERT(app_pid > 0);
 
-  if (app_pid <= 0) {
-    return 0;
-  }
-
-  CLOUD_PRINTER_TRACE(
-    String().format("killing %s:%d", project_name().cstring(), app_pid));
-  if (connection()->kill_pid(app_pid, LINK_SIGINT) < 0) {
-    return -1;
-  }
+  TaskManager task_manager(connection()->driver());
+  task_manager.kill_pid(app_pid, LINK_SIGINT);
 
   // give a little time for the program to shut down
-  CLOUD_PRINTER_TRACE("Wait for killed program to stop");
   int retries = 0;
-  while (((app_pid = connection()->get_pid(project_name())) > 0)
+  while (((app_pid = task_manager.get_pid(project_name())) > 0)
          && (retries < 5)) {
     retries++;
-    chrono::wait(chrono::Milliseconds(100));
+    chrono::wait(100_milliseconds);
   }
-
-  return 0;
 }
 
-int Installer::clean_application() {
-  String unlink_path;
-  int count = 0;
-  printer().key("clean", project_name());
-  unlink_path = String("/app/flash/") + project_name();
-  while (File::remove(unlink_path, fs::File::LinkDriver(connection()->driver()))
-         >= 0) {
-    // delete all versions
-    count++;
+void Installer::clean_application() {
+  {
+    printer().key("clean", project_name());
+    const fs::Path unlink_path = fs::Path("/app/flash") / project_name();
+
+    while (is_success()) {
+      FileSystem(connection()->driver()).remove(unlink_path.string_view());
+      // delete all versions
+    }
+    API_RESET_ERROR();
   }
 
-  unlink_path = String("/app/ram/") + project_name();
-  while (File::remove(unlink_path, fs::File::LinkDriver(connection()->driver()))
-         >= 0) {
-    count++;
+  {
+    const fs::Path unlink_path = fs::Path("/app/ram") / project_name();
+    while (is_success()) {
+      FileSystem(connection()->driver()).remove(unlink_path.string_view());
+    }
+    API_RESET_ERROR();
   }
-  return count;
 }
 
 void Installer::print_transfer_info(
   const fs::File &image,
-  const chrono::Timer &transfer_timer) {
+  const chrono::ClockTimer &transfer_timer) {
+  API_RETURN_IF_ERROR();
 
   const u32 size = image.size();
   PrinterObject po(printer(), "transfer");
-  printer().key("size", "%d", size);
+  printer().key("size", NumberString(size).string_view());
 
   printer().key(
     "duration",
-    "%0.3fs",
-    transfer_timer.microseconds() * 1.0f / 1000000.0f);
+    NumberString(transfer_timer.microseconds() * 1.0f / 1000000.0f, "%0.3fs")
+      .string_view());
 
   printer().key(
     "rate",
-    "%0.3fKB/s",
-    size * 1.0f / transfer_timer.microseconds() * 1000000.0f / 1024.0f);
+    NumberString(
+      size * 1.0f / transfer_timer.microseconds() * 1000000.0f / 1024.0f,
+      "%0.3fKB/s")
+      .string_view());
 }

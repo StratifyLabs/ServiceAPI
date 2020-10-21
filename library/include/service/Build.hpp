@@ -48,17 +48,17 @@ public:
     }
   };
 
-  class BuildSectionImageInfo : public json::JsonKeyValue {
+  class SectionImageInfo : public json::JsonKeyValue {
   public:
-    explicit BuildSectionImageInfo(const char *key)
+    explicit SectionImageInfo(const char *key)
       : JsonKeyValue(key, json::JsonObject()) {}
 
-    BuildSectionImageInfo(const char *key, const json::JsonObject &object)
+    SectionImageInfo(const char *key, const json::JsonObject &object)
       : JsonKeyValue(key, object) {}
 
-    JSON_ACCESS_STRING(BuildSectionImageInfo, image);
-    JSON_ACCESS_STRING(BuildSectionImageInfo, hash);
-    JSON_ACCESS_INTEGER(BuildSectionImageInfo, padding);
+    JSON_ACCESS_STRING(SectionImageInfo, image);
+    JSON_ACCESS_STRING(SectionImageInfo, hash);
+    JSON_ACCESS_INTEGER(SectionImageInfo, padding);
 
     var::Data get_image_data() const {
       return var::Base64()
@@ -66,11 +66,11 @@ public:
         .append(var::Data::from_string(get_hash()));
     }
 
-    BuildSectionImageInfo &set_image_data(var::View image_view) {
+    SectionImageInfo &set_image_data(var::View image_view) {
       return set_image(var::Base64().encode(image_view).cstring());
     }
 
-    BuildSectionImageInfo &calculate_hash() {
+    SectionImageInfo &calculate_hash() {
       var::Data image = get_image_data();
       HashInfo hash_info(image);
       set_hash(hash_info.value().cstring());
@@ -98,7 +98,7 @@ public:
     JSON_ACCESS_INTEGER_WITH_KEY(ImageInfo, secretKeySize, secret_key_size);
     JSON_ACCESS_OBJECT_LIST_WITH_KEY(
       ImageInfo,
-      BuildSectionImageInfo,
+      SectionImageInfo,
       sections,
       section_list);
 
@@ -164,7 +164,7 @@ public:
     API_AC(Construct, var::StringView, url);
   };
 
-  Build(const Construct &options);
+  Build(const Construct &options = Construct());
 
   enum class Type { unknown, application, os, data };
 

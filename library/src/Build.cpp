@@ -78,7 +78,8 @@ Build &Build::import_compiled(const ImportCompiled &options) {
       if (
         options.build().is_empty()
         || Build::normalize_name(build_directory_entry.string_view())
-             == Build::normalize_name(options.build())) {
+               .string_view()
+             == Build::normalize_name(options.build()).string_view()) {
 
         fs::Path file_path = get_build_file_path(
           options.path(),
@@ -91,15 +92,13 @@ Build &Build::import_compiled(const ImportCompiled &options) {
                         .reserve(file_image.size() + 512));
 
         mcu_board_config_t mcu_board_config = {0};
-        json::JsonKeyValueList<BuildSectionImageInfo> section_list;
+        json::JsonKeyValueList<SectionImageInfo> section_list;
 
         if (is_application()) {
           // make sure settings are populated in the binary
           CLOUD_PRINTER_TRACE("set application binary properties");
 
           const sys::Version version(project_settings.get_version());
-          appfs_file_t header;
-          file_image.read(View(header));
 
           sos::Appfs::FileAttributes()
             .set_name(String(project_settings.get_name()))
@@ -108,9 +107,12 @@ Build &Build::import_compiled(const ImportCompiled &options) {
             .set_flash(false)
             .set_ram_size(0)
             .set_version(version.to_bcd16())
-            .apply(&header);
+            .apply(file_image);
 
-          data_image.write(View(header));
+          data_image.write(
+            file_image.seek(0),
+            File::Write().set_size(sizeof(appfs_header_t)));
+
         } else if (is_os()) {
 
 #if 0
@@ -128,7 +130,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
           for (const SectionPathInfo &section : section_path_list) {
             section_list.push_back(
-              BuildSectionImageInfo(section.name())
+              SectionImageInfo(section.name())
                 .set_image_data(
                   DataFile().write(File(fs::Path(section.path()))).data()));
           }
@@ -203,8 +205,8 @@ Build &Build::append_hash(const var::StringView build_name) {
   ImageInfo image_info = build_image_info(build_name);
   image_info.calculate_hash();
 
-  Vector<BuildSectionImageInfo> section_info_list = image_info.section_list();
-  for (BuildSectionImageInfo &section : section_info_list) {
+  Vector<SectionImageInfo> section_info_list = image_info.section_list();
+  for (SectionImageInfo &section : section_info_list) {
     section.calculate_hash();
   }
   return *this;

@@ -33,10 +33,10 @@ Document::list(var::StringView path, var::StringView mask) {
   return result;
 }
 
-Document::Document(const var::StringView path, const Id &id) {
+Document::Document(const var::StringView path, const Id &id)
+  : m_path(path), m_id(id) {
   if (id.is_empty() == false) {
-    to_object() = cloud().get_document(
-      Path(path).append("/").append(id.cstring()).cstring());
+    to_object() = cloud().get_document(Path(path) / id);
   }
 }
 
