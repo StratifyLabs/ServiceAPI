@@ -87,7 +87,7 @@ void Document::interface_save() {
   JsonObject::KeyList key_list = to_object().key_list();
   // cloud().document_update_mask_fields() = to_object().key_list();
   for (const auto &key : key_list) {
-    cloud().document_update_mask_fields().push_back(String(key.cstring()));
+    cloud().document_update_mask_fields().push_back(key.get_string());
   }
   set_document_id(id());
   cloud().patch_document(get_path_with_id().string_view(), to_object());
@@ -103,8 +103,9 @@ void Document::interface_export_file(const fs::File &file) const {
   JsonDocument().save(*this, file);
 }
 
-Document &
-Document::import_binary_file_to_base64(var::StringView path, const char *key) {
+Document &Document::import_binary_file_to_base64(
+  var::StringView path,
+  const var::StringView key) {
 
   File input(path, fs::OpenMode::read_only());
 
@@ -147,7 +148,7 @@ void Document::sanitize_tag_list() {
 
 const Document &Document::export_base64_to_binary_file(
   var::StringView path,
-  const char *key) const {
+  const var::StringView key) const {
 
   var::StringView input(to_object().at(key).to_cstring());
 

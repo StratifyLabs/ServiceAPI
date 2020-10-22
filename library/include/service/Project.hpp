@@ -20,7 +20,7 @@ public:
   class BuildItem : public json::JsonKeyValue {
   public:
     explicit BuildItem(
-      const char *key,
+      const var::StringView key,
       const json::JsonValue &value = json::JsonString())
       : JsonKeyValue(key, value) {}
 
@@ -30,7 +30,7 @@ public:
   class ThreadStackItem : public json::JsonKeyValue {
   public:
     explicit ThreadStackItem(
-      const char *key,
+      const var::StringView key,
       const json::JsonValue &value = json::JsonInteger())
       : JsonKeyValue(key, value) {}
 

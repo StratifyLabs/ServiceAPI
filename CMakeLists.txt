@@ -16,5 +16,5 @@ project(${LOCAL_NAME} CXX)
 include(CTest)
 
 add_subdirectory(library library)
-#add_subdirectory(tests tests)
+add_subdirectory(tests tests)
 

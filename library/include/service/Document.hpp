@@ -81,10 +81,12 @@ public:
   const Path &path() const { return m_path; }
 
 protected:
-  Document &import_binary_file_to_base64(var::StringView path, const char *key);
+  Document &
+  import_binary_file_to_base64(var::StringView path, const var::StringView key);
 
-  const Document &
-  export_base64_to_binary_file(var::StringView path, const char *key) const;
+  const Document &export_base64_to_binary_file(
+    var::StringView path,
+    const var::StringView key) const;
 
   void interface_import_file(const fs::File &file);
   void interface_export_file(const fs::File &file) const;

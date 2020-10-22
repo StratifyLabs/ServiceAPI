@@ -27,11 +27,11 @@ public:
 
   class IOValue : public json::JsonKeyValue, public cloud::CloudAccess {
   public:
-    IOValue(const char *key, const json::JsonValue &value)
+    IOValue(const var::StringView key, const json::JsonValue &value)
       : JsonKeyValue(key, value) {}
 
     IOValue(
-      const char *key,
+      const var::StringView key,
       const var::Data &crypto_key,
       const json::JsonValue &value)
       : JsonKeyValue(key, json::JsonObject()) {

@@ -50,10 +50,10 @@ public:
 
   class SectionImageInfo : public json::JsonKeyValue {
   public:
-    explicit SectionImageInfo(const char *key)
+    explicit SectionImageInfo(const var::StringView key)
       : JsonKeyValue(key, json::JsonObject()) {}
 
-    SectionImageInfo(const char *key, const json::JsonObject &object)
+    SectionImageInfo(const var::StringView key, const json::JsonObject &object)
       : JsonKeyValue(key, object) {}
 
     JSON_ACCESS_STRING(SectionImageInfo, image);

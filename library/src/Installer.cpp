@@ -152,7 +152,7 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
   const Options &options) {
   var::Vector<AppUpdate> result;
 
-  FileSystem::PathList directory_list
+  fs::PathList directory_list
     = FileSystem(connection()->driver()).read_directory(Dir(directory_path));
 
   for (const auto item : directory_list) {

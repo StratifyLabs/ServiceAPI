@@ -66,7 +66,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
   set_ram_size(project_settings.get_ram_size_cstring());
   set_image_included(true);
 
-  FileSystem::PathList build_directory_list
+  fs::PathList build_directory_list
     = FileSystem().read_directory(Dir(options.path()));
 
   Vector<ImageInfo> local_build_image_list;
@@ -262,8 +262,7 @@ var::Vector<Build::SectionPathInfo> Build::get_section_image_path_list(
 
   // binary is of form <name>.bin
   // are there any files in the output directory with <name>.<section>.bin ?
-  FileSystem::PathList file_list
-    = FileSystem().read_directory(Dir(directory_path));
+  fs::PathList file_list = FileSystem().read_directory(Dir(directory_path));
 
   for (const auto &file : file_list) {
     StringViewList file_name_part_list = file.string_view().split(".");
