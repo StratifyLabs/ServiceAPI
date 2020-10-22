@@ -88,7 +88,7 @@ void Installer::install_id(const Options &options) {
 
 void Installer::install_binary(const Options &options) {
 
-  if (fs::Path(options.binary_path()).suffix() == "json") {
+  if (fs::Path::suffix(options.binary_path()) == "json") {
     Build b = Build(Build::Construct().set_binary_path(options.binary_path()));
     set_project_name(String(b.get_name()));
     return install_build(b, options);
@@ -122,7 +122,7 @@ void Installer::install_path(const Options &options) {
             .set_architecture(architecture()));
 
   set_project_id(String(b.get_project_id()));
-  set_project_name(String(fs::Path(options.project_path()).name()));
+  set_project_name(String(fs::Path::name(options.project_path())));
 
   if (
     b.decode_build_type() == Build::Type::application
@@ -156,7 +156,7 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
     = FileSystem(connection()->driver()).read_directory(Dir(directory_path));
 
   for (const auto item : directory_list) {
-    fs::Path full_path = fs::Path(directory_path) / item;
+    var::PathString full_path = var::PathString(directory_path) / item;
     Appfs::Info info = Appfs(connection()->driver()).get_info(full_path);
 
     if (info.is_valid()) {
@@ -333,7 +333,7 @@ void Installer::install_os_build(Build &build, const Options &options) {
     build.append_hash(options.build_name());
   }
 
-  if (fs::Path(options.destination()).suffix() == "json") {
+  if (fs::Path::suffix(options.destination()) == "json") {
     Link::Path link_path(options.destination(), connection()->driver());
 
     build.remove_other_build_images(options.build_name());
@@ -473,13 +473,13 @@ void Installer::install_application_image(
   printer().progress_key() = "installing";
   chrono::ClockTimer transfer_timer;
   transfer_timer.start();
-  sos::Appfs(Appfs::Construct()
-               .set_executable(true)
-               .set_overwrite(true)
-               .set_mount(
-                 options.destination().is_empty() ? fs::Path("/app")
-                                                  : options.destination())
-               .set_name(attributes.name()))
+  sos::Appfs(
+    Appfs::Construct()
+      .set_executable(true)
+      .set_overwrite(true)
+      .set_mount(
+        options.destination().is_empty() ? "/app" : options.destination())
+      .set_name(attributes.name()))
     .append(image, printer().progress_callback());
   transfer_timer.stop();
   printer().progress_key() = "progress";
@@ -608,7 +608,7 @@ void Installer::save_image_locally(
         = build.build_image_info(options.build_name()).get_section_list();
 
       for (const Build::SectionImageInfo &image_info : section_image_info) {
-        fs::Path section_destination(fs::Path(destination).no_suffix());
+        var::PathString section_destination(fs::Path::no_suffix(destination));
 
         section_destination.append(".").append(image_info.key()).append(".bin");
         printer().key(image_info.key(), "host@" + section_destination);
@@ -638,7 +638,8 @@ void Installer::kill_application(int app_pid) {
 void Installer::clean_application() {
   {
     printer().key("clean", project_name());
-    const fs::Path unlink_path = fs::Path("/app/flash") / project_name();
+    const var::PathString unlink_path
+      = var::PathString("/app/flash") / project_name();
 
     while (is_success()) {
       FileSystem(connection()->driver()).remove(unlink_path.string_view());
@@ -648,7 +649,8 @@ void Installer::clean_application() {
   }
 
   {
-    const fs::Path unlink_path = fs::Path("/app/ram") / project_name();
+    const var::PathString unlink_path
+      = var::PathString("/app/ram") / project_name();
     while (is_success()) {
       FileSystem(connection()->driver()).remove(unlink_path.string_view());
     }

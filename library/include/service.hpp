@@ -12,8 +12,6 @@ namespace service{}
 #include "service/Team.hpp"
 #include "service/Job.hpp"
 #include "service/Installer.hpp"
-#include "service/DatumDocument.hpp"
-#include "service/TestResult.hpp"
 
 using namespace service;
 

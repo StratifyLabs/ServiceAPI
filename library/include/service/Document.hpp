@@ -9,17 +9,16 @@
 
 namespace service {
 
-class Document : public cloud::CloudAccess, public json::JsonValue {
+class Document : public cloud::CloudAccess, public json::JsonObject {
 public:
-  using Id = var::StackString32;
+  using Id = var::KeyString;
 
-  class Path : public var::StackStringObject<Path, 256> {
+  class Path : public var::StackString<Path, 256> {
   public:
     Path() {}
-    Path(const char *a) : var::StackStringObject<Path, 256>(a) {}
-    Path(const var::StringView a) : var::StackStringObject<Path, 256>(a) {}
-    Path(const var::String &a)
-      : var::StackStringObject<Path, 256>(a.cstring()) {}
+    Path(const char *a) : var::StackString<Path, 256>(a) {}
+    Path(const var::StringView a) : var::StackString<Path, 256>(a) {}
+    Path(const var::String &a) : var::StackString<Path, 256>(a.cstring()) {}
 
     Path &operator/(const char *a) { return append("/").append(a); }
     Path &operator/(const Id &a) { return append("/").append(a.cstring()); }
@@ -49,8 +48,8 @@ public:
     }
 
   private:
-    API_AC(Tag, var::StackString32, key);
-    API_AC(Tag, var::StackString32, value);
+    API_AC(Tag, var::KeyString, key);
+    API_AC(Tag, var::KeyString, value);
   };
 
   static bool is_permissions_valid(var::StringView value) {

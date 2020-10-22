@@ -111,7 +111,7 @@ Project &Project::publish_build(const PublishBuild &options) {
   // add the README if it is available
 
   DataFile readme = std::move(DataFile().write(
-    File((fs::Path(options.file_path()) / "README.md").string_view()),
+    File((var::PathString(options.file_path()) / "README.md").string_view()),
     Base64Encoder()));
 
   CLOUD_PRINTER_TRACE("loaded readme " + readme.data().string_view());
@@ -185,7 +185,7 @@ Project::Path Project::get_storage_path(const PublishBuild &options) const {
          / normalized_build_name / get_name();
 }
 
-Build Project::download_build(const var::String &version) const {
+Build Project::download_build(const var::StringView version) const {
   return Build(Build::Construct()
                  .set_project_id(get_document_id())
                  .set_build_id(get_build_id(version)));

@@ -109,7 +109,7 @@ public:
     threadStackList,
     thread_stack_list);
 
-  Build download_build(const var::String &version) const;
+  Build download_build(const var::StringView version) const;
 
   bool is_build_version_valid(const sys::Version &build_version) const;
 

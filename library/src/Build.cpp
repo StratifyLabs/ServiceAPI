@@ -46,7 +46,7 @@ Build::Build(const Construct &options)
 Build &Build::import_compiled(const ImportCompiled &options) {
 
   Project project_settings = Project().import_file(
-    File(fs::Path(options.path()).append("/").append(Project::file_name())));
+    File(var::PathString(options.path()) / Project::file_name()));
 
   API_RETURN_VALUE_IF_ERROR(*this);
 
@@ -81,7 +81,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
                .string_view()
              == Build::normalize_name(options.build()).string_view()) {
 
-        fs::Path file_path = get_build_file_path(
+        var::PathString file_path = get_build_file_path(
           options.path(),
           build_directory_entry.string_view());
 
@@ -132,7 +132,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
             section_list.push_back(
               SectionImageInfo(section.name())
                 .set_image_data(
-                  DataFile().write(File(fs::Path(section.path()))).data()));
+                  DataFile().write(File(section.path().string_view())).data()));
           }
         }
 
@@ -239,16 +239,12 @@ Build &Build::save(const Save &options) {
   return *this;
 }
 
-fs::Path Build::get_build_file_path(
+var::PathString Build::get_build_file_path(
   const var::StringView path,
   const var::StringView build) {
 
-  return fs::Path(path)
-    .append("/")
-    .append(build)
-    .append("/")
-    .append(get_name())
-    .append(decode_build_type() == Type::os ? ".bin" : "");
+  return var::PathString(path) / build / get_name()
+         += (decode_build_type() == Type::os ? ".bin" : "");
 }
 
 var::Vector<Build::SectionPathInfo> Build::get_section_image_path_list(
@@ -259,9 +255,10 @@ var::Vector<Build::SectionPathInfo> Build::get_section_image_path_list(
     return result;
   }
 
-  const fs::Path binary_path = get_build_file_path(path, build);
-  const String directory_path = String(binary_path.parent_directory());
-  const StringView base_name = binary_path.base_name();
+  const var::PathString binary_path = get_build_file_path(path, build);
+  const var::StringView directory_path
+    = fs::Path::parent_directory(binary_path.string_view());
+  const StringView base_name = fs::Path::base_name(binary_path.string_view());
 
   // binary is of form <name>.bin
   // are there any files in the output directory with <name>.<section>.bin ?
@@ -333,8 +330,8 @@ var::StringView Build::encode_build_type(Type type) {
   return result;
 }
 
-fs::Path Build::normalize_name(const var::StringView build_name) const {
-  fs::Path result;
+var::NameString Build::normalize_name(const var::StringView build_name) const {
+  var::NameString result;
   if (build_name.find("build_") == 0) {
     result.append(build_name);
   } else {

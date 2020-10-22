@@ -264,7 +264,7 @@ public:
   var::Data get_image(const var::StringView name) const;
   Build &set_image(const var::StringView name, const var::Data &image);
 
-  fs::Path normalize_name(const var::StringView build_name) const;
+  var::NameString normalize_name(const var::StringView build_name) const;
 
   class Save {
     API_AC(Save, var::StringView, project_id);
@@ -304,7 +304,7 @@ private:
       .append(build_name);
   }
 
-  fs::Path
+  var::PathString
   get_build_file_path(const var::StringView path, const var::StringView build);
 
   var::Vector<SectionPathInfo> get_section_image_path_list(
