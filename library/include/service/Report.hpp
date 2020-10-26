@@ -21,9 +21,9 @@ public:
   // if a project is associated with this report
   JSON_ACCESS_STRING_WITH_KEY(Report, projectId, project_id);
 
-  Report &save(const fs::File &contents);
+  Report &save(const fs::FileObject &contents);
 
-  Report &download_contents(const fs::File &destination);
+  Report &download_contents(const fs::FileObject &destination);
 
   Path get_storage_path() const {
     API_ASSERT(!id().is_empty());

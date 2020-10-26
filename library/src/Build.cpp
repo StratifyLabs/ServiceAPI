@@ -229,8 +229,8 @@ Build &Build::save(const Save &options) {
   for (const ImageInfo &build_image_info : list) {
 
     cloud().create_storage_object(
-      ViewFile(build_image_info.get_image_data()),
       create_storage_path(build_image_info.get_name()),
+      ViewFile(build_image_info.get_image_data()),
       StackString64().format("%d of %d", count, list.count()));
 
     count++;

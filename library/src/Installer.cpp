@@ -16,7 +16,7 @@ Installer::Installer(sos::Link *link_connection)
 Installer &Installer::install(const Options &options) {
 
   if (connection()->is_connected_and_is_not_bootloader()) {
-    set_architecture(String(connection()->sys_info().arch()));
+    set_architecture(String(connection()->info().sys_info().arch()));
   } else {
     set_architecture(options.architecture());
   }
@@ -176,7 +176,7 @@ void Installer::update_apps(
 
     sys::Version current_version = sys::Version::from_u16(app.info().version());
 
-    PrinterObject po(printer(), app_project.get_name());
+    Printer::Object po(printer(), app_project.get_name());
     printer().key("id", app_project.get_document_id());
     if (!app_project.get_team_id().is_empty()) {
       printer().key("team", app_project.get_team_id());
@@ -212,11 +212,12 @@ void Installer::update_apps(
 
 void Installer::update_os(const Options &options) {
 
-  Project os_project(Project::Id(connection()->sys_info().id()));
+  Project os_project(Project::Id(connection()->info().sys_info().id()));
 
-  sys::Version current_version(connection()->sys_info().system_version());
+  sys::Version current_version(
+    connection()->info().sys_info().system_version());
 
-  PrinterObject po(printer(), os_project.get_name());
+  Printer::Object po(printer(), os_project.get_name());
   printer().key("id", os_project.get_document_id());
   if (!os_project.get_team_id().is_empty()) {
     printer().key("team", os_project.get_team_id());
@@ -299,13 +300,13 @@ void Installer::install_os_build(Build &build, const Options &options) {
 
     StringView existing_secret_key = options.secret_key();
 
-    StringView thing_team = connection()->sys_info().team_id();
+    StringView thing_team = connection()->info().sys_info().team_id();
     if (thing_team.is_empty()) {
       thing_team = options.team_id();
     }
 
     if (options.secret_key().is_empty() && !options.is_rekey_thing()) {
-      Thing thing(connection()->sys_info());
+      Thing thing(connection()->info().sys_info());
       if (thing.is_error()) {
         // no thing there
         API_RETURN_ASSIGN_ERROR("secret key not accessible", EPERM);
@@ -321,7 +322,7 @@ void Installer::install_os_build(Build &build, const Options &options) {
     StringView secret_key
       = build.build_image_info(options.build_name()).get_secret_key();
 
-    PrinterObject po(printer(), "secretKey");
+    Printer::Object po(printer(), "secretKey");
     printer().key("key256", secret_key);
     printer().key(
       "key128",
@@ -367,9 +368,9 @@ void Installer::install_os_build(Build &build, const Options &options) {
 
   if (is_success() && options.is_synchronize_thing()) {
     // update the thing with the new version that is installed
-    PrinterObject po(printer(), "thing");
+    Printer::Object po(printer(), "thing");
 
-    Thing thing(connection()->sys_info());
+    Thing thing(connection()->info().sys_info());
     thing.set_secret_key(
       build.build_image_info(options.build_name()).get_secret_key());
 
@@ -386,7 +387,7 @@ void Installer::install_os_build(Build &build, const Options &options) {
 }
 
 void Installer::install_application_image(
-  const fs::File &image,
+  const fs::FileObject &image,
   const Options &options) {
 
   {
@@ -442,7 +443,7 @@ void Installer::install_application_image(
     .apply(image);
 
   {
-    PrinterObject po(printer(), "appfsAttributes");
+    Printer::Object po(printer(), "appfsAttributes");
     printer().key("name", attributes.name());
     printer().key("version", version.string_view());
     printer().key("id", attributes.id());
@@ -493,11 +494,11 @@ void Installer::install_application_image(
 
 void Installer::install_os_image(
   const Build &build,
-  const File &image,
+  const FileObject &image,
   const Options &options) {
 
   save_image_locally(build, image, Options(options).set_os());
-  PrinterObject po(printer(), "bootloader");
+  Printer::Object po(printer(), "bootloader");
   {
     if (!connection()->is_bootloader()) {
 
@@ -531,13 +532,7 @@ void Installer::install_os_image(
 
     print_transfer_info(image, transfer_timer);
 
-    if (connection()->reset() < 0) {
-      set_error_message(
-        "Failed to reset the OS with connection error "
-        "message: "
-        + connection()->error_message());
-      return;
-    }
+    connection()->reset();
   }
 
   if (options.is_reconnect()) {
@@ -555,9 +550,11 @@ void Installer::reconnect(const Options &options) {
 
   printer().progress_key() = "reconnecting";
   for (u32 i = 0; i < options.retry_reconnect_count(); i++) {
-    if (connection()->reconnect(1, options.delay()) == 0) {
+    connection()->reconnect(1, options.delay());
+    if (is_success()) {
       break;
     }
+    API_RESET_ERROR();
     printer().update_progress(
       static_cast<int>(i),
       api::ProgressCallback::indeterminate_progress_total());
@@ -572,7 +569,7 @@ void Installer::reconnect(const Options &options) {
 
 void Installer::save_image_locally(
   const Build &build,
-  const fs::File &image,
+  const fs::FileObject &image,
   const Options &options) {
   if (!options.destination().is_empty()) {
     CLOUD_PRINTER_TRACE("saving image to " + options.destination());
@@ -597,7 +594,7 @@ void Installer::save_image_locally(
             + (options.is_os() ? ".bin" : "");
 
       } else {
-        destination = link_path.path();
+        destination = link_path.path().get_string();
       }
 
       File(File::IsOverwrite::yes, destination).write(image);
@@ -659,12 +656,12 @@ void Installer::clean_application() {
 }
 
 void Installer::print_transfer_info(
-  const fs::File &image,
+  const fs::FileObject &image,
   const chrono::ClockTimer &transfer_timer) {
   API_RETURN_IF_ERROR();
 
   const u32 size = image.size();
-  PrinterObject po(printer(), "transfer");
+  Printer::Object po(printer(), "transfer");
   printer().key("size", NumberString(size).string_view());
 
   printer().key(

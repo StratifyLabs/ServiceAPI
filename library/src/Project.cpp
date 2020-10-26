@@ -90,10 +90,7 @@ Project &Project::publish_build(const PublishBuild &options) {
   }
 
   if (get_team_id() != existing_project.get_team_id()) {
-    set_error_message(
-      "the local team ID `" + get_team_id()
-      + "` does not match the team for the published project `"
-      + existing_project.get_team_id() + "`");
+
     return *this;
   }
 

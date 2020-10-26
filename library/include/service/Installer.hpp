@@ -89,7 +89,7 @@ public:
   Installer &install(const Options &options);
 
   void print_transfer_info(
-    const fs::File &image,
+    const fs::FileObject &image,
     const chrono::ClockTimer &transfer_timer);
 
 private:
@@ -121,14 +121,16 @@ private:
 
   void install_os_image(
     const Build &build,
-    const fs::File &image,
+    const fs::FileObject &image,
     const Options &options);
 
-  void install_application_image(const fs::File &image, const Options &options);
+  void install_application_image(
+    const fs::FileObject &image,
+    const Options &options);
 
   void save_image_locally(
     const Build &build,
-    const fs::File &image,
+    const fs::FileObject &image,
     const Options &options);
 
   void reconnect(const Options &options);

@@ -61,7 +61,7 @@ void Document::interface_save() {
 
   if (id().is_empty()) {
 
-    const var::String result = cloud().create_document(
+    const var::KeyString result = cloud().create_document(
       path().string_view(),
       to_object(),
       id().string_view());

@@ -9,6 +9,7 @@ set(CMAKE_TOOLCHAIN_FILE ${CMAKE_MODULE_PATH}/sos-toolchain.cmake)
 include(sos-sdk)
 
 include(targets/CloudAPI)
+include(targets/CryptoAPI)
 include(targets/SosAPI)
 
 set(LOCAL_NAME ServiceAPI)

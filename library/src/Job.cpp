@@ -13,9 +13,10 @@ json::JsonValue Job::publish(const JobOptions &options) {
   Path object_path = Path("jobs") / get_document_id();
 
   // does the job exists
-  Job::Object job_object = cloud().get_database_object(
-    object_path,
-    cloud::Cloud::IsRequestShallow(true));
+  Job::Object job_object
+    = cloud()
+        .get_database_value(object_path, cloud::Cloud::IsRequestShallow(true))
+        .to_object();
 
   if (job_object.is_valid()) {
     ClockTimer timeout_timer;
@@ -26,7 +27,7 @@ json::JsonValue Job::publish(const JobOptions &options) {
     IOValue input_value("", crypto_key, options.input());
 
     timeout_timer.restart();
-    String input_id = cloud().create_database_object(
+    KeyString input_id = cloud().create_database_object(
       object_path + "/input",
       input_value.get_value());
     if (input_id.is_empty()) {
@@ -40,7 +41,7 @@ json::JsonValue Job::publish(const JobOptions &options) {
     // wait for result to post
     do {
 
-      object = cloud().get_database_object(object_path + "/output");
+      object = cloud().get_database_value(object_path + "/output");
       if (object.at(input_id).is_valid()) {
         // job is complete -- delete the output
         cloud().remove_database_object(object_path + "/output/" + input_id);
@@ -57,7 +58,7 @@ json::JsonValue Job::publish(const JobOptions &options) {
 
 bool Job::ping(const JobOptions &options) {
 
-  cloud().get_database_object(
+  cloud().get_database_value(
     (Path("jobs") / options.id()).string_view(),
     NullFile(),
     cloud::Cloud::IsRequestShallow(true));
@@ -107,7 +108,9 @@ Job::Server &Job::Server::create(const JobOptions &options) {
 Job::Server &Job::Server::listen() {
   const String job_path = "jobs/" + id();
   m_timeout_timer.restart();
-  cloud().listen_database_stream(job_path, listen_callback_function, this);
+
+  // cloud().listen_database_stream(job_path, listen_callback_function, this);
+
   return *this;
 }
 
@@ -159,7 +162,7 @@ bool Job::Server::listen_callback(
   if (data.is_valid() && data.is_object()) {
     const String path = "jobs/" + id();
 
-    Job::Object object = cloud().get_database_object(path);
+    Job::Object object = cloud().get_database_value(path).to_object();
 
     json::JsonKeyValueList<Job::IOValue> input_list = object.get_input();
 

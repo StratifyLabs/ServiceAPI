@@ -1,4 +1,5 @@
 
+include(targets/CryptoAPI)
 include(targets/CloudAPI)
 include(targets/SosAPI)
 

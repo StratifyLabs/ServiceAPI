@@ -72,12 +72,12 @@ public:
     Server &listen();
 
   private:
-    API_AC(Server, var::String, type);
+    API_AS(Server, type);
     API_AB(Server, stop, false);
     API_AC(Server, chrono::MicroTime, timeout);
     API_AF(Server, callback_t, callback, nullptr);
     API_AF(Server, void *, context, nullptr);
-    API_RAC(Server, var::String, id);
+    API_AS(Server, id);
     API_RAC(Server, Document::Id, document_id);
     API_AC(Server, var::Data, crypto_key);
 
