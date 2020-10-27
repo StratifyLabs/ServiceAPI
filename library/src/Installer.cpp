@@ -427,7 +427,7 @@ void Installer::install_application_image(
 
   sys::Version version(options.version());
 
-  Appfs::FileAttributes attributes;
+  Appfs::FileAttributes attributes(image);
   attributes.set_name(project_name() + options.suffix())
     .set_id(project_id())
     .set_startup(options.is_startup())

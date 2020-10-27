@@ -100,7 +100,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
           const sys::Version version(project_settings.get_version());
 
-          sos::Appfs::FileAttributes()
+          sos::Appfs::FileAttributes(file_image)
             .set_name(String(project_settings.get_name()))
             .set_id(String(project_settings.get_document_id()))
             .set_startup(false)
