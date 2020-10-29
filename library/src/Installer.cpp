@@ -16,7 +16,7 @@ Installer::Installer(sos::Link *link_connection)
 Installer &Installer::install(const Options &options) {
 
   if (connection()->is_connected_and_is_not_bootloader()) {
-    set_architecture(String(connection()->info().sys_info().arch()));
+    set_architecture(connection()->info().sys_info().architecture());
   } else {
     set_architecture(options.architecture());
   }
@@ -620,7 +620,7 @@ void Installer::save_image_locally(
 void Installer::kill_application(int app_pid) {
   API_ASSERT(app_pid > 0);
 
-  TaskManager task_manager(connection()->driver());
+  TaskManager task_manager("", connection()->driver());
   task_manager.kill_pid(app_pid, LINK_SIGINT);
 
   // give a little time for the program to shut down

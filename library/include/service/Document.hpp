@@ -11,7 +11,9 @@ namespace service {
 
 class Document : public cloud::CloudAccess, public json::JsonObject {
 public:
-  using Id = var::KeyString;
+  using Id = var::IdString;
+
+  enum class Permissions { private_, public_, searchable };
 
   class Path : public var::StackString<Path, 256> {
   public:
@@ -133,6 +135,23 @@ public:
 
   Derived &import_file(const fs::File &a) {
     Document::interface_import_file(a);
+    return static_cast<Derived &>(*this);
+  }
+
+  Derived &set_permissions(Permissions permissions) {
+    var::StringView p;
+    switch (permissions) {
+    case Permissions::private_:
+      p = "private";
+      break;
+    case Permissions::public_:
+      p = "public";
+      break;
+    case Permissions::searchable:
+      p = "searchable";
+      break;
+    }
+    set_permissions(p);
     return static_cast<Derived &>(*this);
   }
 

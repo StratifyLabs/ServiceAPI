@@ -204,11 +204,11 @@ Project::Id Project::get_build_id(const var::StringView version) const {
       // grab the latest
       if (version > latest_version) {
         latest_version = version;
-        build_id = item.key();
+        build_id = item.key().string_view();
       }
 
     } else if (version == check_version) {
-      return Id(item.key());
+      return Id(item.key().string_view());
     }
   }
 

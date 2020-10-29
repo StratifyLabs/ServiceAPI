@@ -42,6 +42,7 @@ Document::Document(const var::StringView path, const Id &id)
 
 void Document::interface_save() {
 
+  printf("%s():%d\n", __FUNCTION__, __LINE__);
   set_timestamp(DateTime::get_system_time().ctime());
   set_user_id(cloud().credentials().get_uid_cstring());
   convert_tags_to_list(); // tags -> tagList
@@ -57,10 +58,7 @@ void Document::interface_save() {
     get_permissions() == "public" || get_permissions() == "private"
     || get_permissions() == "searchable");
 
-  const bool is_create = id().is_empty();
-
   if (id().is_empty()) {
-
     const var::KeyString result = cloud().create_document(
       path().string_view(),
       to_object(),
@@ -68,7 +66,7 @@ void Document::interface_save() {
 
     if (result != "") {
       // once document is uploaded it should be modified to include the id
-      set_document_id(result);
+      m_id = result.cstring();
     } else {
       JsonObject error
         = JsonDocument().from_string(cloud().document_error()).to_object();
@@ -84,11 +82,6 @@ void Document::interface_save() {
 
   // add keys from object to update mask
   cloud().document_update_mask_fields().clear();
-  JsonObject::KeyList key_list = to_object().key_list();
-  // cloud().document_update_mask_fields() = to_object().key_list();
-  for (const auto &key : key_list) {
-    cloud().document_update_mask_fields().push_back(key.get_string());
-  }
   set_document_id(id());
   cloud().patch_document(get_path_with_id().string_view(), to_object());
   return;
@@ -96,6 +89,7 @@ void Document::interface_save() {
 
 void Document::interface_import_file(const fs::File &file) {
   to_object() = JsonDocument().load(file);
+  m_id = get_document_id();
   convert_tags_to_list(); // tags -> tagList
 }
 
