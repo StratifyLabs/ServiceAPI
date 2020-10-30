@@ -2,6 +2,7 @@
 #include <cstdio>
 
 #include <chrono.hpp>
+#include <crypto.hpp>
 #include <fs.hpp>
 #include <json.hpp>
 #include <printer.hpp>
@@ -21,9 +22,8 @@ public:
     Document::set_default_cloud(m_cloud);
 
     TEST_ASSERT_RESULT(login_test());
-    printf("%s():%d\n", __FUNCTION__, __LINE__);
     TEST_ASSERT_RESULT(document_test());
-    printf("%s():%d\n", __FUNCTION__, __LINE__);
+    TEST_ASSERT_RESULT(hardware_test());
 
     TEST_ASSERT_RESULT(report_test());
     TEST_ASSERT_RESULT(project_test());
@@ -42,7 +42,32 @@ public:
   bool thing_test() { return true; }
   bool user_test() { return true; }
   bool team_test() { return true; }
-  bool hardware_test() { return true; }
+  bool hardware_test() {
+
+    Array<u8, 32> buffer;
+    Random().seed().randomize(buffer);
+    const String hardware_id = View(buffer).to_string();
+    {
+      Hardware hardware;
+      hardware.set_permissions(Hardware::Permissions::public_)
+        .set_feature_list(
+          Vector<Hardware::Feature>()
+            .push_back(Hardware::Feature().set_key("flash").set_value("256KB"))
+            .push_back(Hardware::Feature().set_key("ram").set_value("32KB")));
+
+      TEST_ASSERT(hardware.set_id(hardware_id).save().is_success());
+    }
+
+    {
+      Hardware hardware(hardware_id.string_view());
+      TEST_ASSERT(is_success());
+
+      TEST_ASSERT(hardware.get_permissions() == "public");
+    }
+
+    return true;
+  }
+
   bool document_test() {
 
     class Generic : public DocumentAccess<Generic> {
@@ -53,11 +78,14 @@ public:
     Generic::Id id;
     {
       Generic doc;
+      TEST_ASSERT(doc.path() == "generic");
+      TEST_ASSERT(doc.id().is_empty());
       TEST_ASSERT(is_success());
       doc.set_permissions(Generic::Permissions::public_).save();
       TEST_ASSERT(is_success());
 
       id = doc.id();
+      TEST_ASSERT(doc.id() == doc.get_document_id());
 
       TEST_ASSERT(doc.export_file(File(File::IsOverwrite::yes, "generic.json"))
                     .is_success());

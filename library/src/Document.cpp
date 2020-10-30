@@ -37,12 +37,12 @@ Document::Document(const var::StringView path, const Id &id)
   : m_path(path), m_id(id) {
   if (id.is_empty() == false) {
     to_object() = cloud().get_document(Path(path) / id);
+    m_is_existing = is_success();
   }
 }
 
 void Document::interface_save() {
 
-  printf("%s():%d\n", __FUNCTION__, __LINE__);
   set_timestamp(DateTime::get_system_time().ctime());
   set_user_id(cloud().credentials().get_uid_cstring());
   convert_tags_to_list(); // tags -> tagList
@@ -58,7 +58,7 @@ void Document::interface_save() {
     get_permissions() == "public" || get_permissions() == "private"
     || get_permissions() == "searchable");
 
-  if (id().is_empty()) {
+  if (get_document_id().is_empty()) {
     const var::KeyString result = cloud().create_document(
       path().string_view(),
       to_object(),
@@ -141,13 +141,13 @@ void Document::sanitize_tag_list() {
 }
 
 const Document &Document::export_base64_to_binary_file(
-  var::StringView path,
+  const var::StringView path,
   const var::StringView key) const {
 
-  var::StringView input(to_object().at(key).to_cstring());
+  var::StringView input(to_object().at(key).to_string_view());
 
   File(fs::File::IsOverwrite::yes, path)
-    .write(ViewFile(View(input)), Base64Decoder());
+    .write(ViewFile(View(input)), Base64Encoder());
 
   return *this;
 }

@@ -87,16 +87,20 @@ protected:
   import_binary_file_to_base64(var::StringView path, const var::StringView key);
 
   const Document &export_base64_to_binary_file(
-    var::StringView path,
+    const var::StringView path,
     const var::StringView key) const;
 
   void interface_import_file(const fs::File &file);
   void interface_export_file(const fs::File &file) const;
   virtual void interface_save();
 
+protected:
+  void set_id(const var::StringView id) { m_id = id; }
+
 private:
   Path m_path;
   Id m_id;
+  bool m_is_existing = false;
 
   Path get_path_with_id() const {
     return Path(path()).append("/").append(id());
@@ -130,6 +134,11 @@ public:
 
   Derived &save() {
     Document::interface_save();
+    return static_cast<Derived &>(*this);
+  }
+
+  Derived &set_id(const var::StringView id) {
+    Document::set_id(id);
     return static_cast<Derived &>(*this);
   }
 
