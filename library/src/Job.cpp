@@ -82,10 +82,6 @@ void Job::IOValue::encrypt_value(
 
   set_initialization_vector(key.initialization_vector_string());
 
-  printer::Printer p;
-  p.object("Ekey", key);
-  p.key("Eiv", get_initialization_vector());
-
   DataFile encrypted_file
     = DataFile()
         .write(
@@ -95,10 +91,7 @@ void Job::IOValue::encrypt_value(
             .set_initialization_vector(key.initialization_vector()))
         .move();
 
-  p.key("Edata", encrypted_file.data().to_string());
-
   set_blob(Base64().encode(encrypted_file.data()));
-  p.key("Eblob", get_blob());
 }
 
 json::JsonValue Job::IOValue::decrypt_value(const crypto::Aes::Key &key) const {
@@ -108,11 +101,6 @@ json::JsonValue Job::IOValue::decrypt_value(const crypto::Aes::Key &key) const {
 
   const Data iv_data = Data::from_string(iv_string);
   const Data cipher_data = Base64().decode(get_blob());
-
-  printer::Printer p;
-  p.object("Dkey", key);
-  p.key("Div", iv_string);
-  p.key("Ddata", DataFile().write(cipher_data).data().to_string());
 
   return JsonDocument().load(
     DataFile()
@@ -186,19 +174,16 @@ void Job::Server::process_input(const json::JsonValue &data) {
 
       if (callback()) {
 
-        printf("execute callback for type %s\n", object.get_type_cstring());
         JsonValue output = callback()(
           context(),
           object.get_type(),
           input_list.at(input.key()).decrypt_value(crypto_key()));
 
-        printf("create output\n");
         cloud().create_database_object(
           Path(path) / "output",
           Job::IOValue("", crypto_key(), output).get_value(),
           input.key());
 
-        printf("remove input\n");
         cloud().remove_database_object(Path(path) / "input" / input.key());
       }
     }
