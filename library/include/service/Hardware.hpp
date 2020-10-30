@@ -7,13 +7,6 @@
 
 namespace service {
 
-/*!
- * \brief Thing class
- * \details The Thing class refers to the Things
- * of Internet of Things. A Thing is product
- * that deploys Stratify OS.
- *
- */
 class Hardware : public DocumentAccess<Hardware> {
 public:
   class Feature : public json::JsonValue {
@@ -28,6 +21,8 @@ public:
   JSON_ACCESS_STRING_WITH_KEY(Hardware, mbedDriveName, mbed_drive_name);
   JSON_ACCESS_STRING_WITH_KEY(Hardware, sessionTicket, session_ticket);
   JSON_ACCESS_ARRAY_WITH_KEY(Hardware, Feature, features, feature_list);
+
+  using FeatureList = var::Vector<Feature>;
 
 private:
 };

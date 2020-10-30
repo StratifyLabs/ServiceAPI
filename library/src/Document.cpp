@@ -73,8 +73,9 @@ void Document::interface_save() {
       if (
         error.at("error").to_object().at("status").to_string()
         == "ALREADY_EXISTS") {
-
+        API_RETURN_ASSIGN_ERROR("", EEXIST);
       } else {
+        API_RETURN_ASSIGN_ERROR("", EIO);
         return;
       }
     }

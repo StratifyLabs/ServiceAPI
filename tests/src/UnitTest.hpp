@@ -22,14 +22,18 @@ public:
     Document::set_default_cloud(m_cloud);
 
     TEST_ASSERT_RESULT(login_test());
+#if 0
     TEST_ASSERT_RESULT(document_test());
     TEST_ASSERT_RESULT(hardware_test());
+    TEST_ASSERT_RESULT(team_test());
+    TEST_ASSERT_RESULT(user_test());
+#endif
 
     TEST_ASSERT_RESULT(report_test());
+    TEST_ASSERT_RESULT(thing_test());
     TEST_ASSERT_RESULT(project_test());
     TEST_ASSERT_RESULT(build_test());
     TEST_ASSERT_RESULT(installer_test());
-    TEST_ASSERT_RESULT(thing_test());
 
     return true;
   }
@@ -38,10 +42,99 @@ public:
   bool build_test() { return true; }
   bool project_test() { return true; }
   bool job_test() { return true; }
-  bool report_test() { return true; }
   bool thing_test() { return true; }
-  bool user_test() { return true; }
-  bool team_test() { return true; }
+
+  bool report_test() {
+
+    Report::Id id;
+    {
+      Report report;
+
+      JsonDocument().save(
+        JsonObject()
+          .insert("result", JsonString("pass"))
+          .insert("time", JsonString("fast"))
+          .insert("color", JsonString("blue")),
+        File(File::IsOverwrite::yes, "report.json"));
+
+      report.set_permissions(Report::Permissions::private_)
+        .save(File("report.json"));
+
+      TEST_ASSERT(is_success());
+      id = report.id();
+    }
+
+    {
+
+      Report report(id, File(fs::File::IsOverwrite::yes, "download.json"));
+      TEST_ASSERT(is_success());
+
+      TEST_ASSERT(
+        DataFile().write(File("report.json")).data()
+        == DataFile().write(File("download.json")).data());
+    }
+
+    return true;
+  }
+
+  bool user_test() {
+
+    const StringView user_id = m_cloud.credentials().get_uid();
+    User user;
+    user.set_permissions(User::Permissions::public_).set_id(user_id).save();
+    API_RESET_ERROR();
+
+    User::AdminProfile user_admin_profile(user_id);
+    API_RESET_ERROR();
+    user_admin_profile.set_permissions(User::Permissions::private_)
+      .set_account("free")
+      .save();
+    TEST_ASSERT(is_success());
+
+    User::PrivateProfile user_private_profile(user_id);
+    API_RESET_ERROR();
+    user_private_profile.set_permissions(User::Permissions::private_)
+      .set_email_public(false)
+      .save();
+    TEST_ASSERT(is_success());
+
+    User::PublicProfile user_public_profile(user_id);
+    API_RESET_ERROR();
+    user_public_profile.set_permissions(User::Permissions::public_)
+      .set_email("Test@email.com")
+      .save();
+    TEST_ASSERT(is_success());
+    return true;
+  }
+  bool team_test() {
+
+    Team::Id id;
+    {
+      Team team;
+      TEST_ASSERT(team.set_name("TestTeam")
+                    .set_permissions(Team::Permissions::private_)
+                    .save()
+                    .is_success());
+      id = team.get_document_id();
+      TEST_ASSERT(id.is_empty() == false);
+    }
+    {
+      Team team(id);
+      TEST_ASSERT(is_success());
+      TEST_ASSERT(team.get_name() == "TestTeam");
+
+      Team::User user(id);
+      user.set_admin(false)
+        .set_permissions(Team::Permissions::private_)
+        .set_create(true)
+        .set_read(true)
+        .set_write(false)
+        .set_id(m_cloud.credentials().get_uid())
+        .save();
+    }
+
+    return true;
+  }
   bool hardware_test() {
 
     Array<u8, 32> buffer;
@@ -61,8 +154,11 @@ public:
     {
       Hardware hardware(hardware_id.string_view());
       TEST_ASSERT(is_success());
-
       TEST_ASSERT(hardware.get_permissions() == "public");
+      const auto feature_list = hardware.get_feature_list();
+      TEST_ASSERT(feature_list.count() == 2);
+      TEST_ASSERT(feature_list.at(0).get_key() == "flash");
+      TEST_ASSERT(feature_list.at(0).get_value() == "256KB");
     }
 
     return true;

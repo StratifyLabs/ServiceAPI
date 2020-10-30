@@ -2,4 +2,4 @@
 
 using namespace service;
 
-Team::Team(const Id &id) : DocumentAccess("team", id) {}
+Team::Team(const Id &id) : DocumentAccess("teams", id) {}

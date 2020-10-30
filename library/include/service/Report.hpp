@@ -1,6 +1,7 @@
 #ifndef SERVICE_API_SERVICE_REPORT_HPP
 #define SERVICE_API_SERVICE_REPORT_HPP
 
+#include <crypto/Aes.hpp>
 #include <fs/File.hpp>
 
 #include "Document.hpp"
@@ -10,7 +11,8 @@ namespace service {
 
 class Report : public DocumentAccess<Report> {
 public:
-  explicit Report(const Id &id = Id());
+  Report();
+  Report(const Id &id, const fs::FileObject &destination);
 
   JSON_ACCESS_STRING(Report, name);
 
@@ -20,15 +22,21 @@ public:
   JSON_ACCESS_STRING_WITH_KEY(Report, thingId, thing_id);
   // if a project is associated with this report
   JSON_ACCESS_STRING_WITH_KEY(Report, projectId, project_id);
+  JSON_ACCESS_STRING(Report, key);
+  JSON_ACCESS_STRING(Report, iv);
+  JSON_ACCESS_INTEGER(Report, padding);
 
   Report &save(const fs::FileObject &contents);
 
-  Report &download_contents(const fs::FileObject &destination);
 
   Path get_storage_path() const {
     API_ASSERT(!id().is_empty());
-    return (Path("reports") / id()).append(".md");
+    return (Path("reports") / id()).append(".aes");
   }
+
+private:
+  API_AC(Report, crypto::Aes::Key, secret_key);
+  void download_contents(const fs::FileObject &destination);
 };
 
 } // namespace service

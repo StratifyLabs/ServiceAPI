@@ -32,7 +32,7 @@ public:
   class PrivateProfile : public DocumentAccess<PrivateProfile> {
   public:
     PrivateProfile(const Id &id)
-      : DocumentAccess(Path("users") / id / "/profile", Id("private")) {}
+      : DocumentAccess(Path("users") / id / "profile", Id("private")) {}
 
     JSON_ACCESS_BOOL_WITH_KEY(PrivateProfile, isEmailPublic, email_public);
     JSON_ACCESS_BOOL_WITH_KEY(
@@ -50,7 +50,7 @@ public:
       sl_login_completed);
   };
 
-  User(const Id &id);
+  User(const Id &id = "");
 
   JSON_ACCESS_STRING_WITH_KEY(User, displayName, display_name);
   JSON_ACCESS_STRING(User, email);
