@@ -2,13 +2,15 @@
 #include <crypto.hpp>
 #include <fs.hpp>
 #include <json.hpp>
+#include <thread.hpp>
 #include <var.hpp>
 
 #include "service/Job.hpp"
 
 using namespace service;
 
-json::JsonValue Job::publish(const JobOptions &options) {
+json::JsonValue
+Job::publish(const JsonValue &input, const chrono::MicroTime &timeout) {
 
   Path object_path = Path("jobs") / get_document_id();
 
@@ -22,13 +24,13 @@ json::JsonValue Job::publish(const JobOptions &options) {
     ClockTimer timeout_timer;
     // need to wait for the job to complete
 
-    var::Data crypto_key = Base64().decode(get_key());
+    Aes::Key crypto_key(Aes::Key::Construct().set_key(get_key()));
 
-    IOValue input_value("", crypto_key, options.input());
+    IOValue input_value("", crypto_key, input);
 
     timeout_timer.restart();
     KeyString input_id = cloud().create_database_object(
-      object_path + "/input",
+      Path(object_path) / "input",
       input_value.get_value());
     if (input_id.is_empty()) {
       CLOUD_PRINTER_TRACE(
@@ -41,110 +43,76 @@ json::JsonValue Job::publish(const JobOptions &options) {
     // wait for result to post
     do {
 
-      object = cloud().get_database_value(object_path + "/output");
+      object = cloud().get_database_value(Path(object_path) / "output");
       if (object.at(input_id).is_valid()) {
         // job is complete -- delete the output
-        cloud().remove_database_object(object_path + "/output/" + input_id);
+        cloud().remove_database_object(Path(object_path) / "output" / input_id);
         return IOValue("", object.at(input_id)).decrypt_value(crypto_key);
       }
+      wait(5_seconds);
 
-    } while ((options.timeout().seconds() == 0
-              || timeout_timer.micro_time() < options.timeout())
-             && !is_stop());
+    } while ((timeout.seconds() == 0 || timeout_timer < timeout) && !is_stop());
   }
 
   return JsonNull();
 }
 
-bool Job::ping(const JobOptions &options) {
-
+bool Job::ping(const var::StringView id) {
   cloud().get_database_value(
-    (Path("jobs") / options.id()).string_view(),
+    Path("jobs") / id,
     NullFile(),
     cloud::Cloud::IsRequestShallow(true));
-
-  return is_success();
+  bool result = is_success();
+  API_RESET_ERROR();
+  return result;
 }
 
-Job::Server::~Server() {
-  // if job exists -- delete it from the database
-  if (m_id.is_empty() == false) {
-    // delete job
-    cloud().remove_database_object((Path("jobs") / m_id));
-  }
-
-  if (m_document_id.is_empty() == false) {
-    cloud().remove_document((Path("jobs") / m_id));
-  }
-}
-
-Job::Server &Job::Server::create(const JobOptions &options) {
-  if (m_id.is_empty() == false) {
-    // delete the job
-    cloud().remove_database_object("jobs/" + m_id);
-    m_id = String();
-  }
-
-  var::Data key(256 / 8);
-  Random().seed().randomize(key);
-  set_crypto_key(key);
-
-  const String string_key = Base64().encode(key);
-
-  Job job = std::move(Job()
-                        .set_permissions(options.permissions())
-                        .set_team_id(options.team())
-                        .set_key(string_key.string_view())
-                        .save());
-
-  cloud().create_database_object(
-    "jobs",
-    Job::Object().set_type(type()),
-    job.get_document_id());
-
-  return *this;
-}
-
-Job::Server &Job::Server::listen() {
-  const String job_path = "jobs/" + id();
-  m_timeout_timer.restart();
-
-  // cloud().listen_database_stream(job_path, listen_callback_function, this);
-
-  return *this;
-}
-
-Job::IOValue &Job::IOValue::encrypt_value(
+void Job::IOValue::encrypt_value(
   const json::JsonValue &value,
-  const var::Data &crypto_key) {
+  const crypto::Aes::Key &key) {
 
-  const var::String string_value
+  var::String string_value
     = JsonDocument()
         .set_option_flags(JsonDocument::OptionFlags::compact)
         .stringify(value);
+  const size_t padding = Aes::get_padding(string_value.length());
+  string_value += (String("\n") * padding);
 
-  Aes::InitializationVector iv;
-  Random().seed().randomize(iv);
+  API_ASSERT(string_value.length() % 16 == 0);
 
-  set_initialization_vector(View(iv).to_string());
+  set_initialization_vector(key.initialization_vector_string());
 
-  set_blob(Base64().encode(
-    DataFile()
-      .write(
-        ViewFile(string_value),
-        AesCbcEncrypter().set_key256(crypto_key).set_initialization_vector(iv))
-      .data()));
+  printer::Printer p;
+  p.object("Ekey", key);
+  p.key("Eiv", get_initialization_vector());
 
-  return *this;
+  DataFile encrypted_file
+    = DataFile()
+        .write(
+          ViewFile(string_value),
+          AesCbcEncrypter()
+            .set_key256(key.key256())
+            .set_initialization_vector(key.initialization_vector()))
+        .move();
+
+  p.key("Edata", encrypted_file.data().to_string());
+
+  set_blob(Base64().encode(encrypted_file.data()));
+  p.key("Eblob", get_blob());
 }
 
-json::JsonValue Job::IOValue::decrypt_value(const var::Data &crypto_key) const {
+json::JsonValue Job::IOValue::decrypt_value(const crypto::Aes::Key &key) const {
 
   // iv is 16 bytes -- 32 characters
-  StringView iv_string = get_initialization_vector();
+  const StringView iv_string = get_initialization_vector();
 
   const Data iv_data = Data::from_string(iv_string);
   const Data cipher_data = Base64().decode(get_blob());
+
+  printer::Printer p;
+  p.object("Dkey", key);
+  p.key("Div", iv_string);
+  p.key("Ddata", DataFile().write(cipher_data).data().to_string());
 
   return JsonDocument().load(
     DataFile()
@@ -152,37 +120,86 @@ json::JsonValue Job::IOValue::decrypt_value(const var::Data &crypto_key) const {
       .write(
         ViewFile(cipher_data),
         AesCbcDecrypter().set_initialization_vector(iv_data).set_key256(
-          crypto_key)));
+          key.key256()))
+      .seek(0));
 }
 
-bool Job::Server::listen_callback(
-  const var::StringView event,
-  const json::JsonValue &data) {
-  MCU_UNUSED_ARGUMENT(event);
+Job::Server::~Server() {
+  // if job exists -- delete it from the database
+  if (id().is_empty() == false) {
+    // delete job
+    const Path job_path = Path("jobs") / id();
+    // cloud().remove_database_object(job_path.string_view());
+    // cloud().remove_document(job_path.string_view());
+  }
+}
+
+Job::Server &
+Job::Server::start(const var::StringView type, const Job &job_document) {
+
+  API_ASSERT(id().is_empty());
+  API_ASSERT(job_document.get_document_id().is_empty());
+  API_ASSERT(job_document.get_permissions().is_empty() == false);
+
+  Job job(job_document);
+  job.set_type(type).set_key(crypto_key().get_key256_string()).save();
+
+  m_id = job.get_document_id();
+
+  cloud().create_database_object(
+    "jobs",
+    Job::Object().set_type(type),
+    job.get_document_id());
+
+  if (is_success()) {
+    m_id = job.get_document_id();
+  }
+
+  const PathString job_path = PathString("jobs") / job.get_document_id();
+  m_timeout_timer.restart();
+  fs::LambdaFile listen_file;
+
+  listen_file.set_context(this).set_write_callback(
+    [](void *context, int location, const var::View view) -> int {
+      Job::Server *self = reinterpret_cast<Job::Server *>(context);
+      self->process_input(JsonDocument().from_string(
+        StringView(view.to_const_char(), view.size())));
+
+      return self->is_stop() == false ? view.size() : -1;
+    });
+
+  cloud().listen_database(job_path, listen_file);
+
+  return *this;
+}
+
+void Job::Server::process_input(const json::JsonValue &data) {
   if (data.is_valid() && data.is_object()) {
-    const String path = "jobs/" + id();
+    const Path path = Path("jobs") / id();
 
-    Job::Object object = cloud().get_database_value(path).to_object();
+    Job::Object object
+      = cloud().get_database_value(path.string_view()).to_object();
 
-    json::JsonKeyValueList<Job::IOValue> input_list = object.get_input();
+    auto input_list = object.get_input();
 
-    json::JsonValue::KeyList key_list = input_list.get_key_list();
+    for (const auto &input : input_list) {
 
-    for (const auto key : key_list) {
+      if (callback()) {
 
-      if (callback() && (object.input().at(key).is_valid())) {
-
+        printf("execute callback for type %s\n", object.get_type_cstring());
         JsonValue output = callback()(
           context(),
           object.get_type(),
-          input_list.at(key).decrypt_value(crypto_key()));
+          input_list.at(input.key()).decrypt_value(crypto_key()));
 
+        printf("create output\n");
         cloud().create_database_object(
           Path(path) / "output",
           Job::IOValue("", crypto_key(), output).get_value(),
-          key);
+          input.key());
 
-        cloud().remove_database_object(path + "/input/" + key);
+        printf("remove input\n");
+        cloud().remove_database_object(Path(path) / "input" / input.key());
       }
     }
   } else {
@@ -190,5 +207,4 @@ bool Job::Server::listen_callback(
       callback()(context(), "", JsonNull());
     }
   }
-  return is_stop() == false;
 }

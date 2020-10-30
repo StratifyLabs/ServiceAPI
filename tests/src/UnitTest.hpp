@@ -1,4 +1,4 @@
-﻿
+
 #include <cstdio>
 
 #include <chrono.hpp>
@@ -7,6 +7,7 @@
 #include <json.hpp>
 #include <printer.hpp>
 #include <test/Test.hpp>
+#include <thread.hpp>
 #include <var.hpp>
 
 #include "service.hpp"
@@ -27,9 +28,10 @@ public:
     TEST_ASSERT_RESULT(hardware_test());
     TEST_ASSERT_RESULT(team_test());
     TEST_ASSERT_RESULT(user_test());
+    TEST_ASSERT_RESULT(report_test());
 #endif
 
-    TEST_ASSERT_RESULT(report_test());
+    TEST_ASSERT_RESULT(job_test());
     TEST_ASSERT_RESULT(thing_test());
     TEST_ASSERT_RESULT(project_test());
     TEST_ASSERT_RESULT(build_test());
@@ -41,8 +43,108 @@ public:
   bool installer_test() { return true; }
   bool build_test() { return true; }
   bool project_test() { return true; }
-  bool job_test() { return true; }
   bool thing_test() { return true; }
+  bool job_test() {
+
+    Printer::Object po(printer(), "jobTest");
+    {
+
+      {
+        crypto::Aes::Key key;
+
+        Job::IOValue input(
+          "test",
+          key,
+          JsonObject().insert("name", JsonString("testing")));
+
+        printer().key("encryptKey", key.get_key256_string());
+        printer().key("encryptIv", input.get_initialization_vector());
+        printer().key("encryptBlob", input.get_blob());
+        printer().key(
+          "encryptHex",
+          Base64().decode(input.get_blob()).to_string());
+
+        JsonObject result = input.decrypt_value(key);
+        printer().object("result", result);
+        TEST_ASSERT(result.at("name").to_string_view() == "testing");
+      }
+
+      Thread job_thread(
+        Thread::Construct().set_argument(this).set_function(
+          [](void *args) -> void * {
+            UnitTest *self = reinterpret_cast<UnitTest *>(args);
+            PRINTER_TRACE(self->printer(), "");
+
+            {
+              MutexGuard mg(self->cloud_mutex);
+              self->m_job_server
+                = Job::Server()
+                    .set_context(self)
+                    .set_callback(
+                      [](
+                        void *context,
+                        const var::StringView type,
+                        const json::JsonValue &input_value) -> JsonValue {
+                        UnitTest *self = reinterpret_cast<UnitTest *>(context);
+                        PRINTER_TRACE(self->printer(), "");
+
+                        self->printer().key("type", type);
+                        self->printer().object("object", input_value);
+
+                        if (is_error()) {
+                          self->printer().object("error", error());
+                        }
+
+                        return JsonObject().insert(
+                          "status",
+                          JsonString("completed"));
+                      })
+                    .move();
+            }
+
+            self->m_job_server.start(
+              "sl",
+              Job().set_permissions(Job::Permissions::private_));
+
+            PRINTER_TRACE(self->printer(), "");
+
+            return nullptr;
+          }),
+        Thread::Attributes().set_detach_state(Thread::DetachState::joinable));
+
+      ClockTimer timeout = ClockTimer().start();
+      while ((volatile bool)m_job_server.id().is_empty()
+             && timeout < 5_seconds) {
+        wait(100_milliseconds);
+      }
+
+      TEST_ASSERT(m_job_server.id().is_empty() == false);
+
+      printer().key("jobId", m_job_server.id());
+
+      {
+        MutexGuard mg(cloud_mutex);
+        wait(5_seconds);
+        Job job(m_job_server.id());
+
+        JsonObject result = job.publish(
+          JsonObject().insert("job", JsonString("todo")),
+          10_seconds);
+
+        TEST_ASSERT(result.at("status").to_string_view() == "completed");
+
+        TEST_ASSERT(is_success());
+      }
+
+      m_job_server.set_stop();
+
+      job_thread.join();
+
+      TEST_ASSERT(is_success());
+    }
+
+    return true;
+  }
 
   bool report_test() {
 
@@ -215,4 +317,6 @@ public:
 
 private:
   cloud::Cloud m_cloud;
+  Job::Server m_job_server;
+  Mutex cloud_mutex;
 };

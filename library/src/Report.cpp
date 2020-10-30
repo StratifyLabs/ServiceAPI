@@ -16,8 +16,7 @@ Report::Report(const Id &id, const fs::FileObject &destination)
 
 Report &Report::save(const fs::FileObject &content) {
 
-  const size_t padding_calc = 16 - content.size() % 16;
-  const size_t padding = padding_calc < 16 ? padding_calc : 0;
+  const size_t padding = Aes::get_padding(content.size());
 
   set_key(secret_key().get_key256_string())
     .set_iv(secret_key().initialization_vector_string())
