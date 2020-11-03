@@ -77,7 +77,6 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
   for (const swd::Elf::ProgramHeader &program_header : program_header_list) {
 
-    printf("program is at %x\n", program_header.physical_address());
     const var::StringView name = elf.get_section_name(program_header);
 
     if (name == ".text" || name == ".data") {
@@ -129,6 +128,12 @@ Build &Build::import_compiled(const ImportCompiled &options) {
   Vector<ImageInfo> local_build_image_list;
   for (const auto &build_directory_entry : build_directory_list) {
 
+    if (options.application_architecture().is_empty()) {
+      if (get_arch(build_directory_entry).is_empty() == false) {
+        m_application_architecture = get_arch(build_directory_entry);
+      }
+    }
+
     bool is_included
       = (build_directory_entry.string_view().find("build_") == 0)
         && (build_directory_entry.string_view().find("_link") == StringView::npos);
@@ -137,16 +142,8 @@ Build &Build::import_compiled(const ImportCompiled &options) {
     if (is_included) {
       const var::NameString option_name = normalize_name(options.build());
 
-      printf(
-        "build name %s == %s\n",
-        build_name.cstring(),
-        option_name.cstring());
-      if (options.application_architecture().is_empty() == false) {
-        is_included
+      is_included
         = (options.build().is_empty() || build_name.string_view() == option_name.string_view());
-      } else {
-        is_included = build_name.string_view().find(option_name) == 0;
-      }
     }
 
     if (is_included) {
@@ -155,7 +152,6 @@ Build &Build::import_compiled(const ImportCompiled &options) {
         = PathString(options.path()) / build_directory_entry
           / normalize_elf_name(project_settings.get_name());
 
-      printf("opening %s\n", elf_path.cstring());
       if (FileSystem().exists(elf_path) == false) {
         API_RETURN_VALUE_ASSIGN_ERROR(*this, elf_path.cstring(), EINVAL);
       }
@@ -286,37 +282,6 @@ var::PathString Build::get_build_file_path(
     .append(decode_build_type() == Type::os ? ".bin" : "");
 }
 
-var::Vector<Build::SectionPathInfo> Build::get_section_image_path_list(
-  const var::StringView path,
-  const var::StringView build) {
-  var::Vector<SectionPathInfo> result;
-  if (is_os() == false) {
-    return result;
-  }
-
-  const var::PathString binary_path = get_build_file_path(path, build);
-  const var::StringView directory_path
-    = fs::Path::parent_directory(binary_path.string_view());
-  const StringView base_name = fs::Path::base_name(binary_path.string_view());
-
-  // binary is of form <name>.bin
-  // are there any files in the output directory with <name>.<section>.bin ?
-  fs::PathList file_list = FileSystem().read_directory(Dir(directory_path));
-
-  for (const auto &file : file_list) {
-    StringViewList file_name_part_list = file.string_view().split(".");
-    if (
-      (file_name_part_list.count() == 3)
-      && (file_name_part_list.at(0) == base_name)
-      && (file_name_part_list.at(2) == "bin")) {
-      result.push_back(SectionPathInfo()
-                         .set_name(String(file_name_part_list.at(1)))
-                         .set_path(directory_path + "/" + file.string_view()));
-    }
-  }
-  return result;
-}
-
 bool Build::is_application() const {
   return decode_build_type(get_type()) == Type::application;
 }
@@ -376,9 +341,7 @@ var::NameString Build::normalize_name(const var::StringView build_name) const {
     result.append("build_").append(build_name);
   }
 
-  if (
-    !application_architecture().is_empty()
-    && is_arch_present(result) == false) {
+  if (!application_architecture().is_empty() && get_arch(result).is_empty()) {
     result.append("_").append(application_architecture().string_view());
   }
 
@@ -389,33 +352,30 @@ var::NameString
 Build::normalize_elf_name(const var::StringView project_name) const {
   var::NameString result(project_name);
 
-  if (
-    !application_architecture().is_empty()
-    && is_arch_present(result) == false) {
+  if (!application_architecture().is_empty() && get_arch(result).is_empty()) {
     result &StringView("_") & application_architecture().string_view();
   }
 
   return result &= ".elf";
 }
 
-bool Build::is_arch_present(const var::StringView name) {
-  bool is_arch_present = false;
+var::StringView Build::get_arch(const var::StringView name) {
   if (name.find("_v7em_f5dh") != String::npos) {
-    is_arch_present = true;
+    return "v7em_f5dh";
   }
-  if (!is_arch_present && name.find("_v7em_f5sh") != String::npos) {
-    is_arch_present = true;
+  if (name.find("_v7em_f5sh") != String::npos) {
+    return "v7em_f5sh";
   }
-  if (!is_arch_present && name.find("_v7em_f4sh") != String::npos) {
-    is_arch_present = true;
+  if (name.find("_v7em_f4sh") != String::npos) {
+    return "v7em_f4sh";
   }
-  if (!is_arch_present && name.find("_v7em") != String::npos) {
-    is_arch_present = true;
+  if (name.find("_v7em") != String::npos) {
+    return "v7em";
   }
-  if (!is_arch_present && name.find("_v7m") != String::npos) {
-    is_arch_present = true;
+  if (name.find("_v7m") != String::npos) {
+    return "v7m";
   }
-  return is_arch_present;
+  return var::StringView();
 }
 
 void Build::migrate_build_info_list_20200518() {

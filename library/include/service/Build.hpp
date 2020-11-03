@@ -285,18 +285,13 @@ public:
 
   Build &set_application_architecture(const var::StringView value) {
     if (decode_build_type() == Type::application) {
-      m_application_architecture = var::String(value);
+      m_application_architecture = value;
     }
     return *this;
   }
 
 private:
-  API_READ_ACCESS_COMPOUND(Build, var::String, application_architecture);
-
-  class SectionPathInfo {
-    API_ACCESS_COMPOUND(SectionPathInfo, var::String, name);
-    API_ACCESS_COMPOUND(SectionPathInfo, var::String, path);
-  };
+  API_READ_ACCESS_COMPOUND(Build, var::NameString, application_architecture);
 
   Document::Path create_storage_path(const var::StringView build_name) const {
     return Document::Path("builds") / get_project_id() / get_document_id()
@@ -314,14 +309,10 @@ private:
 
   ImageInfo import_elf_file(const var::StringView path);
 
-  var::Vector<SectionPathInfo> get_section_image_path_list(
-    const var::StringView path,
-    const var::StringView build);
-
   var::String calculate_hash(var::Data &image);
   void migrate_build_info_list_20200518();
 
-  static bool is_arch_present(const var::StringView name);
+  static var::StringView get_arch(const var::StringView name);
 };
 
 } // namespace service
