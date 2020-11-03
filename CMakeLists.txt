@@ -12,6 +12,7 @@ if(NOT DEFINED IS_SDK)
 	include(CloudAPI)
 	include(CryptoAPI)
 	include(SosAPI)
+	include(SwdAPI)
 endif()
 
 set(LOCAL_NAME ServiceAPI)

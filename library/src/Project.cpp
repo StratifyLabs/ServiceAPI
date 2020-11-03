@@ -29,7 +29,8 @@ json::JsonArray Project::list() {
 #endif
 }
 
-Project &Project::publish_build(const PublishBuild &options) {
+Project &Project::save_build(const SaveBuild &options) {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   // does the current version already exist
   sys::Version version(get_version());
@@ -47,6 +48,7 @@ Project &Project::publish_build(const PublishBuild &options) {
   }
 
   if ((permissions == "private") && get_team_id().is_empty()) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
     return *this;
   }
 
@@ -55,19 +57,12 @@ Project &Project::publish_build(const PublishBuild &options) {
   if (id().is_empty()) {
 
     save();
-    if (is_error()) {
-      return *this;
-    }
+    API_RETURN_VALUE_IF_ERROR(*this);
 
     printer().key("id", id().string_view());
 
     Build::Type type = Build::decode_build_type(get_type());
-    String type_command;
-    if (type == Build::Type::os) {
-      type_command = "os";
-    } else {
-      type_command = "app";
-    }
+    const StringView type_command = (type == Build::Type::os) ? "os" : "app";
     printer().key(
       "tip",
       String().format(
@@ -90,48 +85,44 @@ Project &Project::publish_build(const PublishBuild &options) {
   }
 
   if (get_team_id() != existing_project.get_team_id()) {
-
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EPERM);
     return *this;
   }
 
   if (
     existing_project.get_team_id().is_empty()
     && existing_project.get_user_id() != cloud().credentials().get_uid()) {
-    // set_error_message("project permissions error (not owner)");
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EPERM);
     return *this;
   }
 
   // import the build and upload it
-  CLOUD_PRINTER_TRACE("import build from " + options.file_path());
   Build build(Build::Construct().set_project_path(options.file_path()));
 
   // add the README if it is available
 
-  DataFile readme = std::move(DataFile().write(
-    File((var::PathString(options.file_path()) / "README.md").string_view()),
-    Base64Encoder()));
+  DataFile readme = DataFile()
+                      .write(
+                        File(PathString(options.file_path()) / "README.md"),
+                        Base64Encoder())
+                      .move();
 
-  CLOUD_PRINTER_TRACE("loaded readme " + readme.data().string_view());
   set_readme(readme.data().string_view());
-  build.set_readme(readme.data().string_view());
-  build.set_description(options.change_description());
-  build.set_version(version.string_view());
-  build.set_team_id(get_team_id());
-  build.set_permissions(get_permissions());
+  build.set_readme(readme.data().string_view())
+    .set_description(options.change_description())
+    .set_version(version.string_view())
+    .set_team_id(get_team_id())
+    .set_permissions(get_permissions());
 
-  CLOUD_PRINTER_TRACE("assigned readme to build");
-  String build_id;
   // printer().open_array("build.upload");
-  CLOUD_PRINTER_TRACE("uploading build");
   build.save().remove_build_image_data();
 
   printer().object("buildUpload", build.to_object());
 
-  CLOUD_PRINTER_TRACE("update project build list");
-
   BuildList project_build_list = get_build_list();
+
   project_build_list.push_back(
-    BuildItem(build_id).set_version(version.string_view()));
+    BuildItem(build.id()).set_version(version.string_view()));
 
   set_build_list(project_build_list);
 
@@ -165,7 +156,7 @@ bool Project::is_build_version_valid(const sys::Version &build_version) const {
   return true;
 }
 
-Project::Path Project::get_storage_path(const PublishBuild &options) const {
+Project::Path Project::get_storage_path(const SaveBuild &options) const {
 
   Id build_id = get_build_id(options.version());
   if (build_id.is_empty()) {
@@ -182,19 +173,12 @@ Project::Path Project::get_storage_path(const PublishBuild &options) const {
          / normalized_build_name / get_name();
 }
 
-Build Project::download_build(const var::StringView version) const {
-  return Build(Build::Construct()
-                 .set_project_id(get_document_id())
-                 .set_build_id(get_build_id(version)));
-}
-
 Project::Id Project::get_build_id(const var::StringView version) const {
 
   sys::Version latest_version("0.0");
   JsonKeyValueList<BuildItem> list = build_list();
 
   Id build_id;
-
   const sys::Version check_version(version);
 
   for (const BuildItem &item : list) {

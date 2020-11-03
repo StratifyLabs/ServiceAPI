@@ -21,7 +21,7 @@ public:
   };
 
   class HashInfo {
-    API_ACCESS_COMPOUND(HashInfo, var::String, value);
+    API_ACCESS_COMPOUND(HashInfo, var::GeneralString, value);
     API_ACCESS_FUNDAMENTAL(HashInfo, u32, size, 0);
     API_ACCESS_FUNDAMENTAL(HashInfo, u32, padding, 0);
 
@@ -42,7 +42,9 @@ public:
         image.append(padding_block);
       }
 
-      set_value(var::View(crypto::Sha256().update(image).output()).to_string())
+      set_value(var::View(crypto::Sha256().update(image).output())
+                  .to_string()
+                  .string_view())
         .set_padding(padding_length)
         .set_size(image.size());
     }
@@ -67,13 +69,13 @@ public:
     }
 
     SectionImageInfo &set_image_data(var::View image_view) {
-      return set_image(var::Base64().encode(image_view).cstring());
+      return set_image(var::Base64().encode(image_view).string_view());
     }
 
     SectionImageInfo &calculate_hash() {
       var::Data image = get_image_data();
       HashInfo hash_info(image);
-      set_hash(hash_info.value().cstring());
+      set_hash(hash_info.value());
       set_padding(hash_info.padding());
       if (hash_info.padding()) {
         set_image_data(image);
@@ -109,17 +111,23 @@ public:
     }
 
     ImageInfo &set_image_data(const var::View &image_view) {
-      return set_image(var::Base64().encode(image_view).cstring());
+      return set_image(var::Base64().encode(image_view));
     }
 
     ImageInfo &calculate_hash() {
       var::Data image = get_image_data();
       HashInfo hash_info(image);
-      set_hash(hash_info.value().cstring());
+      set_hash(hash_info.value());
       set_padding(hash_info.padding());
       if (hash_info.padding()) {
         set_image_data(image);
       }
+
+      auto section_list = get_section_list();
+      for (auto &section : section_list) {
+        section.calculate_hash();
+      }
+
       return *this;
     }
 
@@ -139,12 +147,9 @@ public:
       }
 
       return var::String();
-      //"builds/" + project_id() + "/" + document_id() + "/" + build_name()
-      //+ "/" + project_name();
     }
 
   private:
-    API_ACCESS_BOOL(BuildOptions, dry_run, false);
     API_ACCESS_COMPOUND(BuildOptions, var::String, build_name);
     API_ACCESS_COMPOUND(BuildOptions, var::String, project_id);
     API_ACCESS_COMPOUND(BuildOptions, var::String, project_name);
@@ -155,10 +160,11 @@ public:
   };
 
   class Construct {
-    API_AC(Construct, var::StringView, binary_path);
-    API_AC(Construct, var::StringView, project_path);
     API_AC(Construct, var::StringView, project_id);
     API_AC(Construct, var::StringView, build_id);
+
+    API_AC(Construct, var::StringView, binary_path);
+    API_AC(Construct, var::StringView, project_path);
     API_AC(Construct, var::StringView, build_name);
     API_AC(Construct, var::StringView, architecture);
     API_AC(Construct, var::StringView, url);
@@ -195,11 +201,9 @@ public:
 
   JSON_ACCESS_STRING(Build, name);
   JSON_ACCESS_STRING(Build, version);
-  JSON_ACCESS_STRING(Build, publisher);
   JSON_ACCESS_STRING(Build, readme);
   JSON_ACCESS_STRING(Build, description);
   JSON_ACCESS_STRING(Build, type);
-  JSON_ACCESS_STRING(Build, permissions);
   JSON_ACCESS_STRING_WITH_KEY(Build, projectId, project_id);
   JSON_ACCESS_ARRAY_WITH_KEY(Build, ImageInfo, buildList, build_image_list);
   JSON_ACCESS_STRING_ARRAY_WITH_KEY(
@@ -230,8 +234,7 @@ public:
     return *this;
   }
 
-  SecretKeyInfo get_secret_key(const var::String &build_name) {
-
+  SecretKeyInfo get_secret_key(const var::StringView build_name) {
     const ImageInfo image_info = build_image_info(normalize_name(build_name));
     if (image_info.is_valid()) {
       return SecretKeyInfo()
@@ -265,6 +268,7 @@ public:
   Build &set_image(const var::StringView name, const var::Data &image);
 
   var::NameString normalize_name(const var::StringView build_name) const;
+  var::NameString normalize_elf_name(const var::StringView project_name) const;
 
   class Save {
     API_AC(Save, var::StringView, project_id);
@@ -295,17 +299,20 @@ private:
   };
 
   Document::Path create_storage_path(const var::StringView build_name) const {
-    return Document::Path()
-      .append("builds/")
-      .append(get_project_id())
-      .append("/")
-      .append(get_document_id())
-      .append("/")
-      .append(build_name);
+    return Document::Path("builds") / get_project_id() / get_document_id()
+           / build_name;
   }
 
   var::PathString
   get_build_file_path(const var::StringView path, const var::StringView build);
+  
+  class ImportElfFile {
+    API_AC(ImportElfFile, json::JsonObject, project_settings);
+    API_AC(ImportElfFile, var::StringView, path);
+    API_AC(ImportElfFile, var::StringView, build_name);
+  };
+
+  ImageInfo import_elf_file(const var::StringView path);
 
   var::Vector<SectionPathInfo> get_section_image_path_list(
     const var::StringView path,
@@ -313,6 +320,8 @@ private:
 
   var::String calculate_hash(var::Data &image);
   void migrate_build_info_list_20200518();
+
+  static bool is_arch_present(const var::StringView name);
 };
 
 } // namespace service

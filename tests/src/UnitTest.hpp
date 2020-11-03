@@ -29,21 +29,60 @@ public:
     TEST_ASSERT_RESULT(team_test());
     TEST_ASSERT_RESULT(user_test());
     TEST_ASSERT_RESULT(report_test());
+    TEST_ASSERT_RESULT(job_test());
 #endif
 
-    TEST_ASSERT_RESULT(job_test());
-    TEST_ASSERT_RESULT(thing_test());
     TEST_ASSERT_RESULT(project_test());
     TEST_ASSERT_RESULT(build_test());
+    TEST_ASSERT_RESULT(thing_test());
     TEST_ASSERT_RESULT(installer_test());
 
     return true;
   }
 
   bool installer_test() { return true; }
-  bool build_test() { return true; }
-  bool project_test() { return true; }
   bool thing_test() { return true; }
+  bool build_test() {
+    Printer::Object po(printer(), "build");
+    {
+      Build build(Build::Construct()
+                    .set_project_path("HelloWorld")
+                    .set_build_name("release")
+                    .set_architecture("v7em_f4sh"));
+      TEST_ASSERT(is_success());
+
+      TEST_ASSERT(build.get_build_image_list().count() == 1);
+      printer().object("build", build);
+    }
+
+    {
+      Build build(Build::Construct()
+                    .set_project_path("HelloWorld")
+                    .set_build_name("release"));
+      TEST_ASSERT(is_success());
+
+      TEST_ASSERT(build.get_build_image_list().count() == 5);
+      printer().object("build", build);
+    }
+
+    return true;
+  }
+
+  bool project_test() {
+    Printer::Object po(printer(), "project");
+    {
+      Project hello_world;
+      TEST_ASSERT(
+        hello_world
+          .import_file(File(PathString("HelloWorld") / Project::file_name()))
+          .is_success);
+
+      printer().object("helloWorld", hello_world);
+    }
+
+    return true;
+  }
+
   bool job_test() {
 
     Printer::Object po(printer(), "jobTest");

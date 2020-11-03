@@ -117,8 +117,8 @@ Job::Server::~Server() {
   if (id().is_empty() == false) {
     // delete job
     const Path job_path = Path("jobs") / id();
-    // cloud().remove_database_object(job_path.string_view());
-    // cloud().remove_document(job_path.string_view());
+    cloud().remove_database_object(job_path.string_view());
+    cloud().remove_document(job_path.string_view());
   }
 }
 

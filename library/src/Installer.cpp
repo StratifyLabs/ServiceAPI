@@ -16,7 +16,7 @@ Installer::Installer(sos::Link *link_connection)
 Installer &Installer::install(const Options &options) {
 
   if (connection()->is_connected_and_is_not_bootloader()) {
-    set_architecture(connection()->info().sys_info().architecture());
+    set_architecture(connection()->info().architecture());
   } else {
     set_architecture(options.architecture());
   }
@@ -152,8 +152,8 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
   const Options &options) {
   var::Vector<AppUpdate> result;
 
-  fs::PathList directory_list
-    = FileSystem(connection()->driver()).read_directory(Dir(directory_path));
+  fs::PathList directory_list = Link::FileSystem(connection()->driver())
+                                  .read_directory(Dir(directory_path));
 
   for (const auto item : directory_list) {
     var::PathString full_path = var::PathString(directory_path) / item;
@@ -212,10 +212,9 @@ void Installer::update_apps(
 
 void Installer::update_os(const Options &options) {
 
-  Project os_project(Project::Id(connection()->info().sys_info().id()));
+  Project os_project(Project::Id(connection()->info().id()));
 
-  sys::Version current_version(
-    connection()->info().sys_info().system_version());
+  sys::Version current_version(connection()->info().system_version());
 
   Printer::Object po(printer(), os_project.get_name());
   printer().key("id", os_project.get_document_id());
@@ -300,13 +299,13 @@ void Installer::install_os_build(Build &build, const Options &options) {
 
     StringView existing_secret_key = options.secret_key();
 
-    StringView thing_team = connection()->info().sys_info().team_id();
+    StringView thing_team = connection()->info().team_id();
     if (thing_team.is_empty()) {
       thing_team = options.team_id();
     }
 
     if (options.secret_key().is_empty() && !options.is_rekey_thing()) {
-      Thing thing(connection()->info().sys_info());
+      Thing thing(Sys::Info(connection()->info().sys_info()));
       if (thing.is_error()) {
         // no thing there
         API_RETURN_ASSIGN_ERROR("secret key not accessible", EPERM);
@@ -370,7 +369,7 @@ void Installer::install_os_build(Build &build, const Options &options) {
     // update the thing with the new version that is installed
     Printer::Object po(printer(), "thing");
 
-    Thing thing(connection()->info().sys_info());
+    Thing thing(Sys::Info(connection()->info().sys_info()));
     thing.set_secret_key(
       build.build_image_info(options.build_name()).get_secret_key());
 
@@ -639,7 +638,8 @@ void Installer::clean_application() {
       = var::PathString("/app/flash") / project_name();
 
     while (is_success()) {
-      FileSystem(connection()->driver()).remove(unlink_path.string_view());
+      Link::FileSystem(connection()->driver())
+        .remove(unlink_path.string_view());
       // delete all versions
     }
     API_RESET_ERROR();
@@ -649,7 +649,8 @@ void Installer::clean_application() {
     const var::PathString unlink_path
       = var::PathString("/app/ram") / project_name();
     while (is_success()) {
-      FileSystem(connection()->driver()).remove(unlink_path.string_view());
+      Link::FileSystem(connection()->driver())
+        .remove(unlink_path.string_view());
     }
     API_RESET_ERROR();
   }
