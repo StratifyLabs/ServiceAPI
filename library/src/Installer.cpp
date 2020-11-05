@@ -470,7 +470,7 @@ void Installer::install_application_image(
     API_RETURN_ASSIGN_ERROR("not connected", EIO);
   }
 
-  printer().progress_key() = "installing";
+  printer().set_progress_key("installing");
   chrono::ClockTimer transfer_timer;
   transfer_timer.start();
   sos::Appfs(
@@ -482,7 +482,7 @@ void Installer::install_application_image(
       .set_name(attributes.name()))
     .append(image, printer().progress_callback());
   transfer_timer.stop();
-  printer().progress_key() = "progress";
+  printer().set_progress_key("progress");
 
   if (is_success()) {
     print_transfer_info(image, transfer_timer);
@@ -505,15 +505,14 @@ void Installer::install_os_image(
       connection()->reset_bootloader();
       chrono::wait(options.delay());
       // now reconnect to the device
+
       reconnect(options);
     }
 
-    if (is_error()) {
-      return;
-    }
+    API_RETURN_IF_ERROR();
 
     ClockTimer transfer_timer;
-    printer().progress_key() = "installing";
+    printer().set_progress_key("installing");
     transfer_timer.start();
     connection()->update_os(
       Link::UpdateOs()
@@ -523,7 +522,7 @@ void Installer::install_os_image(
         .set_verify(options.is_verify()));
 
     transfer_timer.stop();
-    printer().progress_key() = "progress";
+    printer().set_progress_key("progress");
 
     if (is_error()) {
       return;
@@ -547,10 +546,10 @@ void Installer::reconnect(const Options &options) {
     options.retry_reconnect_count(),
     options.delay().milliseconds()));
 
-  printer().progress_key() = "reconnecting";
+  printer().set_progress_key("reconnecting");
   for (u32 i = 0; i < options.retry_reconnect_count(); i++) {
     connection()->reconnect(1, options.delay());
-    if (is_success()) {
+    if (is_success() && connection()->is_connected()) {
       break;
     }
     API_RESET_ERROR();
@@ -558,12 +557,9 @@ void Installer::reconnect(const Options &options) {
       static_cast<int>(i),
       api::ProgressCallback::indeterminate_progress_total());
   }
-  if (connection()->is_connected() == false) {
-    return;
-  }
 
   printer().update_progress(0, 0);
-  printer().progress_key() = "progress";
+  printer().set_progress_key("progress");
 }
 
 void Installer::save_image_locally(

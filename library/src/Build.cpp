@@ -191,12 +191,12 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 Build &Build::import_url(const var::StringView url) {
 
   DataFile response;
-  printer().progress_key() = "downloading";
+  printer().set_progress_key("downloading");
   HttpSecureClient().connect(url).get(
     url,
     Http::Get().set_response(&response).set_progress_callback(
       printer().progress_callback()));
-  printer().progress_key() = "progress";
+  printer().set_progress_key("progress");
   to_object() = JsonDocument().load(response.seek(0)).to_object();
   return *this;
 }
