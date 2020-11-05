@@ -32,9 +32,11 @@ Build::Build(const Construct &options)
   if (options.binary_path().is_empty() == false) {
     if (fs::Path::suffix(options.binary_path()) == "elf") {
     }
+
+    return;
   }
 
-  if (options.url().is_empty()) {
+  if (options.url().is_empty() == false) {
     import_url(options.url());
     return;
   }
@@ -42,7 +44,7 @@ Build::Build(const Construct &options)
   migrate_build_info_list_20200518();
 
   // download the build images
-  if (!options.build_name().is_empty()) {
+  if (options.build_name().is_empty() == false) {
     ImageInfo image_info = build_image_info(options.build_name());
 
     DataFile image;
@@ -123,7 +125,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
   set_image_included(true);
 
   fs::PathList build_directory_list
-    = FileSystem().read_directory(Dir(options.path()));
+    = FileSystem().read_directory(options.path());
 
   Vector<ImageInfo> local_build_image_list;
   for (const auto &build_directory_entry : build_directory_list) {

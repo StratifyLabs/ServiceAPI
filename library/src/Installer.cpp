@@ -152,8 +152,8 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
   const Options &options) {
   var::Vector<AppUpdate> result;
 
-  fs::PathList directory_list = Link::FileSystem(connection()->driver())
-                                  .read_directory(Dir(directory_path));
+  fs::PathList directory_list
+    = Link::FileSystem(connection()->driver()).read_directory(directory_path);
 
   for (const auto item : directory_list) {
     var::PathString full_path = var::PathString(directory_path) / item;
@@ -400,7 +400,8 @@ void Installer::install_application_image(
     }
   }
 
-  int app_pid = sos::TaskManager().get_pid(project_name());
+  int app_pid
+    = sos::TaskManager("", connection()->driver()).get_pid(project_name());
   if (options.is_kill()) {
     if (app_pid > 0) {
       printer().key("kill", project_name());
@@ -479,7 +480,8 @@ void Installer::install_application_image(
       .set_overwrite(true)
       .set_mount(
         options.destination().is_empty() ? "/app" : options.destination())
-      .set_name(attributes.name()))
+      .set_name(attributes.name()),
+    connection()->driver())
     .append(image, printer().progress_callback());
   transfer_timer.stop();
   printer().set_progress_key("progress");
