@@ -268,7 +268,9 @@ public:
   Build &set_image(const var::StringView name, const var::Data &image);
 
   var::NameString normalize_name(const var::StringView build_name) const;
-  var::NameString normalize_elf_name(const var::StringView project_name) const;
+  var::NameString normalize_elf_name(
+    const var::StringView project_name,
+    const var::StringView build_directory) const;
 
   class Save {
     API_AC(Save, var::StringView, project_id);

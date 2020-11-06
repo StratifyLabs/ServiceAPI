@@ -121,8 +121,8 @@ void Installer::install_path(const Options &options) {
             .set_build_name(options.build_name())
             .set_architecture(architecture()));
 
-  set_project_id(String(b.get_project_id()));
-  set_project_name(String(fs::Path::name(options.project_path())));
+  set_project_id(b.get_project_id());
+  set_project_name(fs::Path::name(options.project_path()));
 
   if (
     b.decode_build_type() == Build::Type::application
@@ -421,9 +421,7 @@ void Installer::install_application_image(
     = options.is_flash() ? Appfs(connection()->driver()).is_flash_available()
                          : false;
 
-  if (is_error()) {
-    return;
-  }
+  API_RETURN_IF_ERROR();
 
   sys::Version version(options.version());
 
@@ -442,30 +440,7 @@ void Installer::install_application_image(
     .set_version(version.to_bcd16())
     .apply(image);
 
-  {
-    Printer::Object po(printer(), "appfsAttributes");
-    printer().key("name", attributes.name());
-    printer().key("version", version.string_view());
-    printer().key("id", attributes.id());
-    printer().key_bool("flash", attributes.is_flash());
-    printer().key_bool("startup", attributes.is_startup());
-    printer().key_bool("externalcode", attributes.is_code_external());
-    printer().key_bool("externaldata", attributes.is_data_external());
-    printer().key_bool(
-      "tightlycoupledcode",
-      attributes.is_code_tightly_coupled() != 0);
-    printer().key_bool(
-      "tightlycoupleddata",
-      attributes.is_data_tightly_coupled() != 0);
-    printer().key_bool("authenticated", attributes.is_authenticated());
-    if (attributes.ram_size() == 0) {
-      printer().key("ramsize", String("<default>"));
-    } else {
-      printer().key(
-        "ramsize",
-        NumberString(attributes.ram_size()).string_view());
-    }
-  }
+  printer().object("appfsAttributes", attributes);
 
   if (connection()->is_connected() == false) {
     API_RETURN_ASSIGN_ERROR("not connected", EIO);
@@ -482,7 +457,7 @@ void Installer::install_application_image(
         options.destination().is_empty() ? "/app" : options.destination())
       .set_name(attributes.name()),
     connection()->driver())
-    .append(image, printer().progress_callback());
+    .append(image.seek(0), printer().progress_callback());
   transfer_timer.stop();
   printer().set_progress_key("progress");
 

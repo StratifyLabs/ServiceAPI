@@ -150,9 +150,11 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
     if (is_included) {
 
-      const PathString elf_path
-        = PathString(options.path()) / build_directory_entry
-          / normalize_elf_name(project_settings.get_name());
+      const PathString elf_path = PathString(options.path())
+                                  / build_directory_entry
+                                  / normalize_elf_name(
+                                    project_settings.get_name(),
+                                    build_directory_entry);
 
       if (FileSystem().exists(elf_path) == false) {
         API_RETURN_VALUE_ASSIGN_ERROR(*this, elf_path.cstring(), EINVAL);
@@ -350,12 +352,19 @@ var::NameString Build::normalize_name(const var::StringView build_name) const {
   return result;
 }
 
-var::NameString
-Build::normalize_elf_name(const var::StringView project_name) const {
+var::NameString Build::normalize_elf_name(
+  const var::StringView project_name,
+  const var::StringView build_directory) const {
   var::NameString result(project_name);
 
   if (!application_architecture().is_empty() && get_arch(result).is_empty()) {
     result &StringView("_") & application_architecture().string_view();
+  }
+
+  if (build_directory.find("release") == StringView::npos) {
+    StringView build_name = build_directory.get_substring_at_position(
+      StringView("build_").length());
+    result.append("_").append(build_name);
   }
 
   return result &= ".elf";
