@@ -105,9 +105,8 @@ public:
       section_list);
 
     var::Data get_image_data() const {
-      return var::Base64()
-        .decode(var::StringView(get_image()))
-        .append(var::Data::from_string(get_hash()));
+      return var::Base64().decode(get_image());
+      //.append(var::Data::from_string(get_hash()));
     }
 
     ImageInfo &set_image_data(const var::View &image_view) {

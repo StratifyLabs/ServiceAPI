@@ -53,6 +53,12 @@ public:
 
       TEST_ASSERT(build.get_build_image_list().count() == 1);
       printer().object("build", build);
+
+      File binary("HelloWorld/build_release_v7em_f4sh/HelloWorld");
+      printer().key("fileSize", NumberString(binary.size()));
+      Data image = build.get_image("build_release_v7em_f4sh");
+      printer().key("imageSize", NumberString(image.size()));
+      TEST_ASSERT(image.size() == binary.size());
     }
 
     {

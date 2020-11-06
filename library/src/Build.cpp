@@ -84,13 +84,13 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     if (name == ".text" || name == ".data") {
       data_image.write(
         elf.file().seek(program_header.offset()),
-        File::Write().set_size(program_header.memory_size()));
+        File::Write().set_size(program_header.file_size()));
     } else {
       section_list.push_back(SectionImageInfo(name).set_image_data(
         DataFile()
           .write(
             elf.file().seek(program_header.offset()),
-            File::Write().set_size(program_header.memory_size()))
+            File::Write().set_size(program_header.file_size()))
           .data()));
     }
   }
@@ -99,8 +99,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     .set_image_data(data_image.data())
     .set_secret_key_position(mcu_board_config.secret_key_address)
     .set_secret_key_size(mcu_board_config.secret_key_size)
-    .set_section_list(section_list)
-    .calculate_hash();
+    .set_section_list(section_list);
 }
 
 Build &Build::import_compiled(const ImportCompiled &options) {
@@ -169,8 +168,8 @@ Build &Build::import_compiled(const ImportCompiled &options) {
         // make sure settings are populated in the binary
 
         const sys::Version version(project_settings.get_version());
-
-        Appfs::FileAttributes(data_image.seek(0))
+        Appfs::FileAttributes(
+          data_image.seek(0).set_flags(OpenMode::read_write()))
           .set_name(String(project_settings.get_name()))
           .set_id(String(project_settings.get_document_id()))
           .set_startup(false)
@@ -182,8 +181,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
       local_build_image_list.push_back(
         image_info.set_name(build_directory_entry)
-          .set_image_data(data_image.data())
-          .calculate_hash());
+          .set_image_data(data_image.data()));
     }
   }
 
