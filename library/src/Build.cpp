@@ -163,6 +163,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
       DataFile data_image;
       data_image.data() = image_info.get_image_data();
+      printf("size is %ld\n", data_image.data().size());
 
       if (is_application()) {
         // make sure settings are populated in the binary
@@ -355,15 +356,9 @@ var::NameString Build::normalize_elf_name(
   const var::StringView build_directory) const {
   var::NameString result(project_name);
 
-  if (!application_architecture().is_empty() && get_arch(result).is_empty()) {
-    result &StringView("_") & application_architecture().string_view();
-  }
-
-  if (build_directory.find("release") == StringView::npos) {
-    StringView build_name = build_directory.get_substring_at_position(
-      StringView("build_").length());
-    result.append("_").append(build_name);
-  }
+  StringView build_name
+    = build_directory.get_substring_at_position(StringView("build_").length());
+  result.append("_").append(build_name);
 
   return result &= ".elf";
 }
