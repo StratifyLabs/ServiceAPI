@@ -15,13 +15,13 @@ using namespace service;
 
 Build::Build(const Construct &options)
   : DocumentAccess(
-    Path("projects/").append(options.project_id()).append("/builds"),
+    Path("projects") / options.project_id() / "builds",
     Id(options.build_id())) {
 
+  set_application_architecture(options.architecture());
+
   if (options.project_path().is_empty() == false) {
-
     API_ASSERT(options.build_name().is_empty() == false);
-
     import_compiled(ImportCompiled()
                       .set_path(options.project_path())
                       .set_build(options.build_name())
@@ -45,6 +45,7 @@ Build::Build(const Construct &options)
 
   // download the build images
   if (options.build_name().is_empty() == false) {
+
     ImageInfo image_info = build_image_info(options.build_name());
 
     DataFile image;
@@ -122,6 +123,15 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
   set_ram_size(project_settings.get_ram_size_cstring());
   set_image_included(true);
+
+  // check for a valid build name if provided
+  if (options.build().is_empty() == false) {
+    const PathString build_path
+      = PathString(options.path()) / normalize_name(options.build());
+    if (FileSystem().exists(build_path) == false) {
+      API_RETURN_VALUE_ASSIGN_ERROR(*this, build_path.cstring(), ENOENT);
+    }
+  }
 
   fs::PathList build_directory_list
     = FileSystem().read_directory(options.path());

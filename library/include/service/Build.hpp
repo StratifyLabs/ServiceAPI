@@ -295,8 +295,8 @@ private:
   API_READ_ACCESS_COMPOUND(Build, var::NameString, application_architecture);
 
   Document::Path create_storage_path(const var::StringView build_name) const {
-    return Document::Path("builds") / get_project_id() / get_document_id()
-           / build_name;
+    return Document::Path("builds") / get_project_id() / id()
+           / normalize_name(build_name).string_view() / get_name();
   }
 
   var::PathString

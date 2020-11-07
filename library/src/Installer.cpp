@@ -474,8 +474,8 @@ void Installer::install_os_image(
   const Options &options) {
 
   save_image_locally(build, image, Options(options).set_os());
-  Printer::Object po(printer(), "bootloader");
   {
+    Printer::Object po(printer(), "bootloader");
     if (!connection()->is_bootloader()) {
 
       // bootloader must be invoked

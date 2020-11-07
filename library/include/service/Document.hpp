@@ -11,7 +11,7 @@ namespace service {
 
 class Document : public cloud::CloudAccess, public json::JsonObject {
 public:
-  using Id = var::IdString;
+  using Id = var::KeyString;
 
   enum class Permissions { private_, public_, searchable };
 
@@ -23,9 +23,6 @@ public:
     Path(const var::String &a) : var::StackString<Path, 256>(a.cstring()) {}
 
     Path &operator/(const char *a) { return append("/").append(a); }
-    Path &operator/(const var::KeyString &a) {
-      return append("/").append(a.cstring());
-    }
     Path &operator/(const Id &a) { return append("/").append(a.cstring()); }
     Path &operator/(const Path &a) { return append("/").append(a.cstring()); }
     Path &operator/(const var::StringView a) { return append("/").append(a); }
