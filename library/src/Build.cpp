@@ -163,7 +163,6 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
       DataFile data_image;
       data_image.data() = image_info.get_image_data();
-      printf("size is %ld\n", data_image.data().size());
 
       if (is_application()) {
         // make sure settings are populated in the binary
