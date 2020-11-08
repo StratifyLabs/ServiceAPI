@@ -31,7 +31,11 @@ public:
 
   Path get_storage_path() const {
     API_ASSERT(!id().is_empty());
-    return (Path("reports") / id()).append(".aes");
+    if (get_key().is_empty() == false) {
+      return (Path("reports") / id()).append(".aes");
+    } else {
+      return (Path("reports") / id()).append(".md");
+    }
   }
 
 private:

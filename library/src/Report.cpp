@@ -52,14 +52,21 @@ void Report::download_contents(const fs::FileObject &destination) {
 
     const size_t truncated_size = encrypted_file.size() - get_padding();
 
-    destination.write(
-      DataFile()
-        .write(
-          encrypted_file.seek(0),
-          AesCbcDecrypter()
-            .set_initialization_vector(secret_key().initialization_vector())
-            .set_key256(secret_key().key256()))
-        .resize(truncated_size)
-        .seek(0));
+    if (get_key().is_empty()) {
+      destination.write(DataFile()
+                          .write(encrypted_file.seek(0))
+                          .resize(truncated_size)
+                          .seek(0));
+    } else {
+      destination.write(
+        DataFile()
+          .write(
+            encrypted_file.seek(0),
+            AesCbcDecrypter()
+              .set_initialization_vector(secret_key().initialization_vector())
+              .set_key256(secret_key().key256()))
+          .resize(truncated_size)
+          .seek(0));
+    }
   }
 }
