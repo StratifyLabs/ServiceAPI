@@ -21,11 +21,9 @@ Build::Build(const Construct &options)
   set_application_architecture(options.architecture());
 
   if (options.project_path().is_empty() == false) {
-    API_ASSERT(options.build_name().is_empty() == false);
     import_compiled(ImportCompiled()
                       .set_path(options.project_path())
-                      .set_build(options.build_name())
-                      .set_application_architecture(options.architecture()));
+                      .set_build(options.build_name()));
     return;
   }
 
@@ -115,7 +113,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
     .set_version(project_settings.get_version())
     .set_type(project_settings.get_type())
     .set_permissions(project_settings.get_permissions())
-    .set_application_architecture(options.application_architecture());
+    .set_application_architecture(application_architecture());
 
   if (get_permissions().is_empty()) {
     set_permissions("public");
@@ -139,7 +137,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
   Vector<ImageInfo> local_build_image_list;
   for (const auto &build_directory_entry : build_directory_list) {
 
-    if (options.application_architecture().is_empty()) {
+    if (application_architecture().is_empty()) {
       if (get_arch(build_directory_entry).is_empty() == false) {
         m_application_architecture = get_arch(build_directory_entry);
       }

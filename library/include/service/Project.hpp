@@ -45,7 +45,7 @@ public:
 
   class SaveBuild {
     API_ACCESS_COMPOUND(SaveBuild, var::StringView, change_description);
-    API_ACCESS_COMPOUND(SaveBuild, var::StringView, file_path);
+    API_ACCESS_COMPOUND(SaveBuild, var::StringView, project_path);
     API_ACCESS_COMPOUND(SaveBuild, var::StringView, architecture);
     API_ACCESS_COMPOUND(SaveBuild, var::StringView, version);
     API_ACCESS_COMPOUND(SaveBuild, var::StringView, build_name);

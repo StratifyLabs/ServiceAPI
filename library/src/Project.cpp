@@ -32,6 +32,7 @@ json::JsonArray Project::list() {
 Project &Project::save_build(const SaveBuild &options) {
   API_RETURN_VALUE_IF_ERROR(*this);
 
+  API_ASSERT(options.project_path().is_empty() == false);
   // does the current version already exist
   sys::Version version(get_version());
   set_user_id(cloud().credentials().get_uid_cstring());
@@ -69,9 +70,9 @@ Project &Project::save_build(const SaveBuild &options) {
         "build project with `sl %s.build:path=%s` then use `sl "
         "%s.publish:path=%s,changes=<change description>`",
         String(type_command).cstring(),
-        String(options.file_path()).cstring(),
+        String(options.project_path()).cstring(),
         String(type_command).cstring(),
-        String(options.file_path()).cstring()));
+        String(options.project_path()).cstring()));
     return *this;
   }
 
@@ -97,15 +98,19 @@ Project &Project::save_build(const SaveBuild &options) {
   }
 
   // import the build and upload it
-  Build build(Build::Construct().set_project_path(options.file_path()));
+  Build build(Build::Construct()
+                .set_project_path(options.project_path())
+                .set_project_id(get_document_id()));
 
   // add the README if it is available
 
-  DataFile readme = DataFile()
-                      .write(
-                        File(PathString(options.file_path()) / "README.md"),
-                        Base64Encoder())
-                      .move();
+  const PathString readme_path
+    = PathString(options.project_path()) / "README.md";
+  bool is_readme_available = FileSystem().exists(readme_path);
+  DataFile readme = DataFile().write(File(readme_path), Base64Encoder()).move();
+  if (!is_readme_available) {
+    API_RESET_ERROR();
+  }
 
   set_readme(readme.data().string_view());
   build.set_readme(readme.data().string_view())
@@ -114,10 +119,9 @@ Project &Project::save_build(const SaveBuild &options) {
     .set_team_id(get_team_id())
     .set_permissions(get_permissions());
 
-  // printer().open_array("build.upload");
-  build.save().remove_build_image_data();
+  build.remove_build_image_data().save();
 
-  printer().object("buildUpload", build.to_object());
+  printer().object("buildUpload", build);
 
   BuildList project_build_list = get_build_list();
 

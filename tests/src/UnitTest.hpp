@@ -33,7 +33,7 @@ public:
 #endif
 
     TEST_ASSERT_RESULT(project_test());
-    TEST_ASSERT_RESULT(build_test());
+    // TEST_ASSERT_RESULT(build_test());
     TEST_ASSERT_RESULT(thing_test());
     TEST_ASSERT_RESULT(installer_test());
 
@@ -62,9 +62,7 @@ public:
     }
 
     {
-      Build build(Build::Construct()
-                    .set_project_path("HelloWorld")
-                    .set_build_name("release"));
+      Build build(Build::Construct().set_project_path("HelloWorld"));
       TEST_ASSERT(is_success());
 
       TEST_ASSERT(build.get_build_image_list().count() == 5);
@@ -77,13 +75,21 @@ public:
   bool project_test() {
     Printer::Object po(printer(), "project");
     {
+      const PathString project_path
+        = PathString("HelloWorld") / Project::file_name();
       Project hello_world;
-      TEST_ASSERT(
-        hello_world
-          .import_file(File(PathString("HelloWorld") / Project::file_name()))
-          .is_success);
+      TEST_ASSERT(hello_world.import_file(File(project_path)).is_success);
 
       printer().object("helloWorld", hello_world);
+
+      TEST_ASSERT(
+        hello_world
+          .save_build(Project::SaveBuild().set_project_path("HelloWorld"))
+          .is_success());
+
+      TEST_ASSERT(
+        hello_world.export_file(File(File::IsOverwrite::yes, project_path))
+          .is_success());
     }
 
     return true;

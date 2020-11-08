@@ -185,10 +185,6 @@ public:
   class ImportCompiled {
     API_ACCESS_COMPOUND(ImportCompiled, var::StringView, path);
     API_ACCESS_COMPOUND(ImportCompiled, var::StringView, build);
-    API_ACCESS_COMPOUND(
-      ImportCompiled,
-      var::StringView,
-      application_architecture);
 
   public:
   };
