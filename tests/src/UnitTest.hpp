@@ -75,16 +75,31 @@ public:
 
   bool project_test() {
     Printer::Object po(printer(), "project");
+    sys::Version version;
+    const PathString project_path
+      = PathString("HelloWorld") / Project::file_name();
+    Project::Id project_id;
+
+    Data build_image;
+
     {
-      const PathString project_path
-        = PathString("HelloWorld") / Project::file_name();
+
       Project hello_world;
       TEST_ASSERT(hello_world.import_file(File(project_path)).is_success);
 
+      project_id = hello_world.get_document_id();
+
       printer().object("helloWorld", hello_world);
 
-      sys::Version version(hello_world.get_version());
-      version = sys::Version::from_u16(version.to_bcd16() + 1);
+      Build build(Build::Construct()
+                    .set_project_path("HelloWorld")
+                    .set_architecture("v7em_f4sh"));
+
+      build_image
+        = build.build_image_info("build_release_v7em_f4sh").get_image_data();
+
+      version = sys::Version::from_u16(
+        sys::Version(hello_world.get_version()).to_bcd16() + 1);
       hello_world.set_version(version.string_view());
 
       TEST_ASSERT(
@@ -95,6 +110,25 @@ public:
       TEST_ASSERT(
         hello_world.export_file(File(File::IsOverwrite::yes, project_path))
           .is_success());
+    }
+
+    {
+      Project hello_world(project_id);
+      TEST_ASSERT(is_success());
+
+      // download the build and compare it to the version imported from
+      // compiling
+
+      Build build(
+        Build::Construct()
+          .set_project_id(project_id)
+          .set_build_id(hello_world.get_build_id(version.string_view()))
+          .set_build_name("build_release_v7em_f4sh"));
+
+      Data build_image_downloaded
+        = build.build_image_info("build_release_v7em_f4sh").get_image_data();
+
+      TEST_ASSERT(build_image_downloaded == build_image);
     }
 
     return true;

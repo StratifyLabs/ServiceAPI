@@ -26,7 +26,7 @@ public:
     API_ACCESS_FUNDAMENTAL(HashInfo, u32, padding, 0);
 
   public:
-    HashInfo(var::Data &image) {
+    HashInfo(const var::Data &image) {
 
       const size_t image_size = image.size();
       constexpr size_t hash_size = sizeof(crypto::Sha256::Hash);
@@ -34,12 +34,6 @@ public:
       size_t padding_length = hash_size - image_size % hash_size;
       if (padding_length == hash_size) {
         padding_length = 0;
-      }
-
-      if (padding_length > 0) {
-        var::Data padding_block = var::Data(padding_length);
-        var::View(padding_block).fill<u8>(0xff);
-        image.append(padding_block);
       }
 
       set_value(var::View(crypto::Sha256().update(image).output())
@@ -73,13 +67,9 @@ public:
     }
 
     SectionImageInfo &calculate_hash() {
-      var::Data image = get_image_data();
-      HashInfo hash_info(image);
-      set_hash(hash_info.value());
-      set_padding(hash_info.padding());
-      if (hash_info.padding()) {
-        set_image_data(image);
-      }
+      set_hash(var::View(crypto::Sha256().update(get_image_data()).output())
+                 .to_string()
+                 .string_view());
       return *this;
     }
   };
@@ -115,14 +105,9 @@ public:
     }
 
     ImageInfo &calculate_hash() {
-      var::Data image = get_image_data();
-      HashInfo hash_info(image);
-      set_hash(hash_info.value());
-      set_padding(hash_info.padding());
-      if (hash_info.padding()) {
-        set_image_data(image);
-      }
-
+      set_hash(var::View(crypto::Sha256().update(get_image_data()).output())
+                 .to_string()
+                 .string_view());
       auto section_list = get_section_list();
       for (auto &section : section_list) {
         section.calculate_hash();

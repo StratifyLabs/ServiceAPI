@@ -41,6 +41,10 @@ Build::Build(const Construct &options)
 
   migrate_build_info_list_20200518();
 
+  crypto::Aes::Key key(
+    Aes::Key::Construct().set_key(get_key()).set_initialization_vector(
+      get_iv()));
+
   // download the build images
   if (options.build_name().is_empty() == false) {
 
@@ -56,10 +60,6 @@ Build::Build(const Construct &options)
 
     if (get_key().is_empty() == false) {
 
-      crypto::Aes::Key key(
-        Aes::Key::Construct().set_key(get_key()).set_initialization_vector(
-          get_iv()));
-
       DataFile decrypted_image
         = DataFile()
             .write(
@@ -69,11 +69,15 @@ Build::Build(const Construct &options)
                 .set_initialization_vector(key.initialization_vector()))
             .move();
 
-      image.data() = decrypted_image.data();
+      image.data() = decrypted_image.data().resize(image_info.get_size());
     }
 
     image_info.set_image_data(image.data());
+    return;
   }
+
+  // no build was loaded
+  API_ASSERT(false);
 }
 
 Build::ImageInfo Build::import_elf_file(const var::StringView path) {
@@ -120,7 +124,8 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     .set_size(data_image.size())
     .set_secret_key_position(mcu_board_config.secret_key_address)
     .set_secret_key_size(mcu_board_config.secret_key_size)
-    .set_section_list(section_list);
+    .set_section_list(section_list)
+    .calculate_hash();
 }
 
 Build &Build::import_compiled(const ImportCompiled &options) {
@@ -290,7 +295,7 @@ void Build::interface_save() {
 
   const auto list = get_build_image_list();
 
-  remove_build_image_list();
+  remove_build_image_data();
   DocumentAccess<Build>::interface_save();
   API_RETURN_IF_ERROR();
 
