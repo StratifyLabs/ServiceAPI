@@ -128,12 +128,12 @@ public:
     : Document(document_path, id) {}
 
   Derived &export_file(const fs::File &a) {
-    Document::interface_export_file(a);
+    interface_export_file(a);
     return static_cast<Derived &>(*this);
   }
 
   Derived &save() {
-    Document::interface_save();
+    interface_save();
     return static_cast<Derived &>(*this);
   }
 
@@ -143,7 +143,7 @@ public:
   }
 
   Derived &import_file(const fs::File &a) {
-    Document::interface_import_file(a);
+    interface_import_file(a);
     return static_cast<Derived &>(*this);
   }
 

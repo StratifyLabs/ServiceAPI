@@ -44,12 +44,33 @@ Build::Build(const Construct &options)
   // download the build images
   if (options.build_name().is_empty() == false) {
 
+    API_ASSERT(options.project_id().is_empty() == false);
+    API_ASSERT(options.build_name().is_empty() == false);
+
     ImageInfo image_info = build_image_info(options.build_name());
 
     DataFile image;
     cloud().get_storage_object(
       create_storage_path(options.build_name()),
       image);
+
+    if (get_key().is_empty() == false) {
+
+      crypto::Aes::Key key(
+        Aes::Key::Construct().set_key(get_key()).set_initialization_vector(
+          get_iv()));
+
+      DataFile decrypted_image
+        = DataFile()
+            .write(
+              image.seek(0),
+              AesCbcDecrypter()
+                .set_key256(key.key256())
+                .set_initialization_vector(key.initialization_vector()))
+            .move();
+
+      image.data() = decrypted_image.data();
+    }
 
     image_info.set_image_data(image.data());
   }
@@ -96,6 +117,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
   return Build::ImageInfo()
     .set_image_data(data_image.data())
+    .set_size(data_image.size())
     .set_secret_key_position(mcu_board_config.secret_key_address)
     .set_secret_key_size(mcu_board_config.secret_key_size)
     .set_section_list(section_list);
@@ -257,31 +279,49 @@ Build &Build::append_hash(const var::StringView build_name) {
   return *this;
 }
 
-Build &Build::save(const Save &options) {
-
-  const var::Vector<ImageInfo> list = get_build_image_list();
-
-  var::String build_id;
-  save();
-
-  API_RETURN_VALUE_IF_ERROR(*this);
-
-  StringView name = get_name();
+void Build::interface_save() {
 
   // upload the build images to storage /builds/project_id/build_id/arch/name
   int count = 1;
 
+  Aes::Key key(
+    Aes::Key::Construct().set_key(get_key()).set_initialization_vector(
+      get_iv()));
+
+  const auto list = get_build_image_list();
+
+  remove_build_image_list();
+  DocumentAccess<Build>::interface_save();
+  API_RETURN_IF_ERROR();
+
   for (const ImageInfo &build_image_info : list) {
 
+    Data data = build_image_info.get_image_data();
+
+    Array<u8, 16> padding;
+    View padding_view(padding);
+
+    data.append(padding_view.fill(0).truncate(Aes::get_padding(data.size())));
+
+    DataFile encrypted_file
+      = DataFile()
+          .reserve(data.size() + 16)
+          .write(
+            ViewFile(data),
+            AesCbcEncrypter()
+              .set_key256(key.key256())
+              .set_initialization_vector(key.initialization_vector()))
+          .move();
+
+    KeyString message;
+    message.format("%d of %d", count, list.count());
     cloud().create_storage_object(
       create_storage_path(build_image_info.get_name()),
-      ViewFile(build_image_info.get_image_data()),
-      StackString64().format("%d of %d", count, list.count()));
+      encrypted_file.seek(0),
+      message.string_view());
 
     count++;
   }
-
-  return *this;
 }
 
 var::PathString Build::get_build_file_path(

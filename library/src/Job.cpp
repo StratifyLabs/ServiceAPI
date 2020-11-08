@@ -80,7 +80,7 @@ void Job::IOValue::encrypt_value(
 
   API_ASSERT(string_value.length() % 16 == 0);
 
-  set_initialization_vector(key.initialization_vector_string());
+  set_initialization_vector(key.get_initialization_vector_string());
 
   DataFile encrypted_file
     = DataFile()

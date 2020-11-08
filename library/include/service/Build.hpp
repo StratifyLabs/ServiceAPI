@@ -91,6 +91,7 @@ public:
     JSON_ACCESS_STRING(ImageInfo, name);
     JSON_ACCESS_STRING(ImageInfo, image);
     JSON_ACCESS_STRING(ImageInfo, hash);
+    JSON_ACCESS_INTEGER(ImageInfo, size);
     JSON_ACCESS_INTEGER(ImageInfo, padding);
     JSON_ACCESS_STRING_WITH_KEY(ImageInfo, secretKey, secret_key);
     JSON_ACCESS_INTEGER_WITH_KEY(
@@ -207,6 +208,8 @@ public:
     build_image_list_20200518); // migration list
   JSON_ACCESS_STRING_WITH_KEY(Build, ramSize, ram_size);
   JSON_ACCESS_BOOL_WITH_KEY(Build, isBuildImage, image_included);
+  JSON_ACCESS_STRING(Build, key);
+  JSON_ACCESS_STRING(Build, iv);
 
   Build &remove_build_image_data() {
     var::Vector<ImageInfo> build_list = build_image_list();
@@ -267,14 +270,6 @@ public:
     const var::StringView project_name,
     const var::StringView build_directory) const;
 
-  class Save {
-    API_AC(Save, var::StringView, project_id);
-  };
-
-  Build &save(const Save &options);
-  inline Build &operator()(const Save &options) { return save(options); }
-  using DocumentAccess<Build>::save;
-
   static Type decode_build_type(const var::StringView type);
   static var::StringView encode_build_type(Type type);
 
@@ -286,6 +281,9 @@ public:
     }
     return *this;
   }
+
+protected:
+  void interface_save() override;
 
 private:
   API_READ_ACCESS_COMPOUND(Build, var::NameString, application_architecture);

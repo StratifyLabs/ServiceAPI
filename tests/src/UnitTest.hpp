@@ -17,6 +17,7 @@ public:
   UnitTest(var::StringView name)
     : test::Test(name),
       m_cloud("cloudapitest-2ec81", "AIzaSyCFaqqhpCAQIOXQbtmvcXTvuerk2tPE6tI") {
+    m_cloud.set_default_printer(printer());
   }
 
   bool execute_class_api_case() {
@@ -81,6 +82,10 @@ public:
       TEST_ASSERT(hello_world.import_file(File(project_path)).is_success);
 
       printer().object("helloWorld", hello_world);
+
+      sys::Version version(hello_world.get_version());
+      version = sys::Version::from_u16(version.to_bcd16() + 1);
+      hello_world.set_version(version.string_view());
 
       TEST_ASSERT(
         hello_world

@@ -1,5 +1,6 @@
 
 #include <chrono.hpp>
+#include <crypto.hpp>
 #include <fs.hpp>
 #include <json.hpp>
 #include <printer.hpp>
@@ -112,14 +113,17 @@ Project &Project::save_build(const SaveBuild &options) {
     API_RESET_ERROR();
   }
 
+  crypto::Aes::Key key;
+
   set_readme(readme.data().string_view());
   build.set_readme(readme.data().string_view())
     .set_description(options.change_description())
     .set_version(version.string_view())
     .set_team_id(get_team_id())
-    .set_permissions(get_permissions());
-
-  build.remove_build_image_data().save();
+    .set_permissions(get_permissions())
+    .set_key(key.get_key256_string())
+    .set_iv(key.get_initialization_vector_string())
+    .save();
 
   printer().object("buildUpload", build);
 

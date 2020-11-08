@@ -11,8 +11,12 @@ namespace service {
 
 class Report : public DocumentAccess<Report> {
 public:
+  enum class IsDownloadContents { no, yes };
   Report();
-  Report(const Id &id, const fs::FileObject &destination);
+  Report(
+    const Id &id,
+    const fs::FileObject &destination,
+    IsDownloadContents is_download_contents = IsDownloadContents::yes);
 
   JSON_ACCESS_STRING(Report, name);
 

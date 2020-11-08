@@ -8,10 +8,15 @@ using namespace service;
 
 Report::Report() : DocumentAccess("reports", "") {}
 
-Report::Report(const Id &id, const fs::FileObject &destination)
+Report::Report(
+  const Id &id,
+  const fs::FileObject &destination,
+  IsDownloadContents is_download_contents)
   : DocumentAccess("reports", id) {
 
-  download_contents(destination);
+  if (is_download_contents == IsDownloadContents::yes) {
+    download_contents(destination);
+  }
 }
 
 Report &Report::save(const fs::FileObject &content) {
@@ -19,7 +24,7 @@ Report &Report::save(const fs::FileObject &content) {
   const size_t padding = Aes::get_padding(content.size());
 
   set_key(secret_key().get_key256_string())
-    .set_iv(secret_key().initialization_vector_string())
+    .set_iv(secret_key().get_initialization_vector_string())
     .set_padding(padding);
 
   DataFile encrypted_file;
