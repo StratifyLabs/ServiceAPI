@@ -43,10 +43,12 @@ Document::Document(const var::StringView path, const Id &id)
 
 void Document::interface_save() {
 
+  API_RETURN_IF_ERROR();
   set_timestamp(DateTime::get_system_time().ctime());
   set_user_id(cloud().credentials().get_uid_cstring());
   convert_tags_to_list(); // tags -> tagList
   sanitize_tag_list();    // remove any tag duplicates
+  API_RESET_ERROR();
 
   if (get_team_id() == "") {
     // this will ensure 'team' is present in the object
@@ -70,6 +72,7 @@ void Document::interface_save() {
     } else {
       JsonObject error
         = JsonDocument().from_string(cloud().document_error()).to_object();
+      API_PRINTF_TRACE_LINE();
       if (
         error.at("error").to_object().at("status").to_string()
         == "ALREADY_EXISTS") {

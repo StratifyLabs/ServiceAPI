@@ -75,9 +75,6 @@ Build::Build(const Construct &options)
     image_info.set_image_data(image.data());
     return;
   }
-
-  // no build was loaded
-  API_ASSERT(false);
 }
 
 Build::ImageInfo Build::import_elf_file(const var::StringView path) {

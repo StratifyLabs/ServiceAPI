@@ -94,7 +94,11 @@ void Installer::install_binary(const Options &options) {
     return install_build(b, options);
   }
 
-  DataFile image = std::move(DataFile().write(File(options.binary_path())));
+  DataFile image = DataFile()
+                     .write(File(options.binary_path()))
+                     .set_flags(OpenMode::read_write())
+                     .seek(0)
+                     .move();
 
   if (options.is_application()) {
     Appfs::Info source_image_info = Appfs().get_info(options.binary_path());
@@ -265,7 +269,12 @@ void Installer::install_application_build(
   image.data() = build.get_image(options.build_name());
 
   if (image.size() == 0) {
-    API_RETURN_ASSIGN_ERROR("", EINVAL);
+    API_RETURN_ASSIGN_ERROR(
+      StringView(
+        "could not find build `" + options.build_name().get_string() + "`")
+        .get_string()
+        .cstring(),
+      ENOENT);
   }
 
   printer().key(
@@ -389,15 +398,13 @@ void Installer::install_application_image(
   const fs::FileObject &image,
   const Options &options) {
 
-  {
+  if (!options.destination().is_empty()) {
     save_image_locally(
       Build(Build::Construct()),
       image,
       Options(options).set_application());
 
-    if (is_error()) {
-      return;
-    }
+    return;
   }
 
   int app_pid
@@ -473,7 +480,10 @@ void Installer::install_os_image(
   const FileObject &image,
   const Options &options) {
 
-  save_image_locally(build, image, Options(options).set_os());
+  if (!options.destination().is_empty()) {
+    save_image_locally(build, image, Options(options).set_os());
+    return;
+  }
   {
     Printer::Object po(printer(), "bootloader");
     if (!connection()->is_bootloader()) {
