@@ -136,8 +136,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
     .set_project_id(project_settings.get_document_id())
     .set_version(project_settings.get_version())
     .set_type(project_settings.get_type())
-    .set_permissions(project_settings.get_permissions())
-    .set_application_architecture(application_architecture());
+    .set_permissions(project_settings.get_permissions());
 
   if (get_permissions().is_empty()) {
     set_permissions("public");
@@ -161,10 +160,11 @@ Build &Build::import_compiled(const ImportCompiled &options) {
   Vector<ImageInfo> local_build_image_list;
   for (const auto &build_directory_entry : build_directory_list) {
 
-    if (application_architecture().is_empty()) {
-      if (get_arch(build_directory_entry).is_empty() == false) {
-        m_application_architecture = get_arch(build_directory_entry);
-      }
+    if (
+      application_architecture().is_empty()
+      && (get_arch(build_directory_entry).is_empty() == false)) {
+      // pulls arch from the build directory if not provided
+      m_application_architecture = get_arch(build_directory_entry);
     }
 
     bool is_included
@@ -393,8 +393,10 @@ var::NameString Build::normalize_name(const var::StringView build_name) const {
     result.append("build_").append(build_name);
   }
 
-  if (!application_architecture().is_empty() && get_arch(result).is_empty()) {
-    result.append("_").append(application_architecture().string_view());
+  if (
+    (application_architecture().is_empty() == false)
+    && get_arch(result).is_empty()) {
+    result.append("_").append(application_architecture());
   }
 
   return result;

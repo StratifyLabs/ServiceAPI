@@ -81,7 +81,6 @@ void Installer::install_id(const Options &options) {
             .set_build_id(p.get_build_id(options.version())));
 
   b.set_type(p.get_type());
-  b.set_application_architecture(architecture());
 
   return install_build(b, options);
 }
@@ -120,6 +119,7 @@ void Installer::install_binary(const Options &options) {
 }
 
 void Installer::install_path(const Options &options) {
+
   Build b(Build::Construct()
             .set_project_path(options.project_path())
             .set_build_name(options.build_name())
@@ -182,9 +182,11 @@ void Installer::update_apps(
 
     Printer::Object po(printer(), app_project.get_name());
     printer().key("id", app_project.get_document_id());
-    if (!app_project.get_team_id().is_empty()) {
-      printer().key("team", app_project.get_team_id());
-    }
+    printer().key(
+      "team",
+      app_project.get_team_id().is_empty() ? "<none>"
+                                           : app_project.get_team_id());
+
     printer().key("type", app_project.get_type());
     if (app_project > current_version) {
       printer().key("currentVersion", current_version.string_view());
