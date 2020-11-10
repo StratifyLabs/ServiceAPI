@@ -1,8 +1,8 @@
 #ifndef SERVICE_API_SERVICE_JOB_HPP
 #define SERVICE_API_SERVICE_JOB_HPP
 
-#include <CloudAPI/cloud/CloudObject.hpp>
 #include <chrono/ClockTimer.hpp>
+#include <cloud/CloudObject.hpp>
 #include <fs/LambdaFile.hpp>
 #include <json/Json.hpp>
 #include <var/String.hpp>
