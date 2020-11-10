@@ -236,7 +236,7 @@ Build &Build::import_url(const var::StringView url) {
 }
 
 var::Data Build::get_image(const var::StringView name) const {
-  return std::move(build_image_info(name).get_image_data());
+	return build_image_info(name).get_image_data();
 }
 
 Build &Build::set_image(const var::StringView name, const var::Data &image) {

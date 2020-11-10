@@ -33,7 +33,7 @@ public:
     // implicit conversion
     operator const char *() const { return m_buffer; }
     operator const var::StringView() {
-      return std::move(var::StringView(m_buffer));
+			return var::StringView(m_buffer);
     }
   };
 
