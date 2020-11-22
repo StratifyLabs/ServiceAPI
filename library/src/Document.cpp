@@ -72,7 +72,6 @@ void Document::interface_save() {
     } else {
       JsonObject error
         = JsonDocument().from_string(cloud().document_error()).to_object();
-      API_PRINTF_TRACE_LINE();
       if (
         error.at("error").to_object().at("status").to_string()
         == "ALREADY_EXISTS") {
