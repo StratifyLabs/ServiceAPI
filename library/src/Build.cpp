@@ -1,3 +1,6 @@
+
+#include <sdk/types.h>
+
 #include <crypto.hpp>
 #include <cxxabi.h>
 #include <fs.hpp>
@@ -127,8 +130,8 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
 Build &Build::import_compiled(const ImportCompiled &options) {
 
-  Project project_settings = Project().import_file(
-    File(var::PathString(options.path()) / Project::file_name()));
+  Project project_settings
+    = Project().import_file(File(options.path() / Project::file_name()));
 
   API_RETURN_VALUE_IF_ERROR(*this);
 
@@ -148,7 +151,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
   // check for a valid build name if provided
   if (options.build().is_empty() == false) {
     const PathString build_path
-      = PathString(options.path()) / normalize_name(options.build());
+      = options.path() / normalize_name(options.build()).string_view();
     if (FileSystem().exists(build_path) == false) {
       API_RETURN_VALUE_ASSIGN_ERROR(*this, build_path.cstring(), ENOENT);
     }
@@ -181,11 +184,11 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
     if (is_included) {
 
-      const PathString elf_path = PathString(options.path())
-                                  / build_directory_entry
+      const PathString elf_path = options.path() / build_directory_entry
                                   / normalize_elf_name(
-                                    project_settings.get_name(),
-                                    build_directory_entry);
+                                      project_settings.get_name(),
+                                      build_directory_entry)
+                                      .string_view();
 
       if (FileSystem().exists(elf_path) == false) {
         API_RETURN_VALUE_ASSIGN_ERROR(*this, elf_path.cstring(), EINVAL);
