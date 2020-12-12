@@ -73,7 +73,7 @@ void Job::IOValue::encrypt_value(
 
   var::String string_value
     = JsonDocument()
-        .set_option_flags(JsonDocument::OptionFlags::compact)
+        .set_flags(JsonDocument::Flags::compact)
         .stringify(value);
   const size_t padding = Aes::get_padding(string_value.length());
   string_value += (String("\n") * padding);
