@@ -1,5 +1,5 @@
 
-if(NOT DEFINED IS_SDK)
+if(NOT DEFINED API_IS_SDK)
 	include(CryptoAPI)
 	include(CloudAPI)
 	include(SosAPI)
