@@ -26,7 +26,7 @@ public:
   JSON_ACCESS_STRING_WITH_KEY(Report, thingId, thing_id);
   // if a project is associated with this report
   JSON_ACCESS_STRING_WITH_KEY(Report, projectId, project_id);
-  JSON_ACCESS_STRING(Report, key);
+  JSON_ACCESS_STRING_WITH_KEY(Report, aesKey, key);
   JSON_ACCESS_STRING(Report, iv);
   JSON_ACCESS_INTEGER(Report, padding);
 

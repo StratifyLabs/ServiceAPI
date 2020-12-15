@@ -160,13 +160,14 @@ public:
       }
 
       Thread job_thread(
+        Thread::Attributes().set_detach_state(Thread::DetachState::joinable),
         Thread::Construct().set_argument(this).set_function(
           [](void *args) -> void * {
             UnitTest *self = reinterpret_cast<UnitTest *>(args);
             PRINTER_TRACE(self->printer(), "");
 
             {
-              MutexGuard mg(self->cloud_mutex);
+              Mutex::Guard mg(self->cloud_mutex);
               self->m_job_server
                 = Job::Server()
                     .set_context(self)
@@ -199,8 +200,7 @@ public:
             PRINTER_TRACE(self->printer(), "");
 
             return nullptr;
-          }),
-        Thread::Attributes().set_detach_state(Thread::DetachState::joinable));
+          }));
 
       ClockTimer timeout = ClockTimer().start();
       while ((volatile bool)m_job_server.id().is_empty()
@@ -213,7 +213,7 @@ public:
       printer().key("jobId", m_job_server.id());
 
       {
-        MutexGuard mg(cloud_mutex);
+        Mutex::Guard mg(cloud_mutex);
         wait(5_seconds);
         Job job(m_job_server.id());
 
