@@ -24,6 +24,8 @@ Build::Build(const Construct &options)
   set_application_architecture(options.architecture());
 
   if (options.project_path().is_empty() == false) {
+    CLOUD_PRINTER_TRACE("import compiled project at " & options.project_path());
+
     import_compiled(ImportCompiled()
                       .set_path(options.project_path())
                       .set_build(options.build_name()));
@@ -32,6 +34,7 @@ Build::Build(const Construct &options)
 
   if (options.binary_path().is_empty() == false) {
     if (fs::Path::suffix(options.binary_path()) == "elf") {
+      CLOUD_PRINTER_TRACE("need to imlement importing elf binary");
     }
 
     return;
@@ -135,6 +138,14 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
   API_RETURN_VALUE_IF_ERROR(*this);
 
+  if (fs::Path::name(options.path()) != project_settings.get_name()) {
+    API_RETURN_VALUE_ASSIGN_ERROR(
+      *this,
+      "project folder name does not match project name in `settings.json` for `"
+        & options.path() & "`",
+      EINVAL);
+  }
+
   set_name(project_settings.get_name())
     .set_project_id(project_settings.get_document_id())
     .set_version(project_settings.get_version())
@@ -174,12 +185,20 @@ Build &Build::import_compiled(const ImportCompiled &options) {
       = (build_directory_entry.string_view().find("build_") == 0)
         && (build_directory_entry.string_view().find("_link") == StringView::npos);
 
+    if (is_included) {
+      CLOUD_PRINTER_TRACE("checking build directory " & build_directory_entry);
+    }
+
     const var::NameString build_name = normalize_name(build_directory_entry);
     if (is_included) {
       const var::NameString option_name = normalize_name(options.build());
 
       is_included
-        = (options.build().is_empty() || build_name.string_view() == option_name.string_view());
+        = (options.build().is_empty() || (build_name.string_view() == option_name.string_view()));
+
+      if (is_included == false) {
+        CLOUD_PRINTER_TRACE("excluding " & options.build());
+      }
     }
 
     if (is_included) {
@@ -190,7 +209,10 @@ Build &Build::import_compiled(const ImportCompiled &options) {
                                       build_directory_entry)
                                       .string_view();
 
+      CLOUD_PRINTER_TRACE("elf path " & elf_path);
+
       if (FileSystem().exists(elf_path) == false) {
+        CLOUD_PRINTER_TRACE("elf file " & elf_path & " is missing");
         API_RETURN_VALUE_ASSIGN_ERROR(*this, elf_path.cstring(), EINVAL);
       }
 

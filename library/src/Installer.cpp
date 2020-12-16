@@ -13,7 +13,7 @@ using namespace service;
 Installer::Installer(sos::Link *link_connection)
   : m_connection(link_connection) {}
 
-Installer &Installer::install(const Options &options) {
+Installer &Installer::install(const Install &options) {
 
   if (connection()->is_connected_and_is_not_bootloader()) {
     set_architecture(connection()->info().architecture());
@@ -26,7 +26,7 @@ Installer &Installer::install(const Options &options) {
                                               : Vector<AppUpdate>();
 
   if (options.is_update_os()) {
-    update_os(Options(options).set_reconnect(
+    update_os(Install(options).set_reconnect(
       options.is_reconnect() || options.is_update_apps()));
 
     options.is_update_apps();
@@ -64,12 +64,12 @@ Installer &Installer::install(const Options &options) {
   return *this;
 }
 
-void Installer::install_url(const Options &options) {
+void Installer::install_url(const Install &options) {
   Build b = Build(Build::Construct().set_url(options.url()));
   return install_build(b, options);
 }
 
-void Installer::install_id(const Options &options) {
+void Installer::install_id(const Install &options) {
   Project p(Project::Id(options.project_id()));
   set_project_name(p.get_name());
   set_project_id(p.get_document_id());
@@ -85,7 +85,7 @@ void Installer::install_id(const Options &options) {
   return install_build(b, options);
 }
 
-void Installer::install_binary(const Options &options) {
+void Installer::install_binary(const Install &options) {
 
   if (fs::Path::suffix(options.binary_path()) == "json") {
     Build b = Build(Build::Construct().set_binary_path(options.binary_path()));
@@ -118,7 +118,8 @@ void Installer::install_binary(const Options &options) {
   }
 }
 
-void Installer::install_path(const Options &options) {
+void Installer::install_path(const Install &options) {
+  CLOUD_PRINTER_TRACE("installing from path " & options.project_path());
 
   Build b(Build::Construct()
             .set_project_path(options.project_path())
@@ -142,7 +143,7 @@ void Installer::install_path(const Options &options) {
 }
 
 var::Vector<Installer::AppUpdate>
-Installer::get_app_update_list(const Options &options) {
+Installer::get_app_update_list(const Install &options) {
   var::Vector<AppUpdate> result;
   StringViewList directory_list = options.update_app_directories().split("?");
   for (const auto item : directory_list) {
@@ -153,7 +154,7 @@ Installer::get_app_update_list(const Options &options) {
 
 var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
   const var::StringView directory_path,
-  const Options &options) {
+  const Install &options) {
   var::Vector<AppUpdate> result;
 
   fs::PathList directory_list
@@ -174,7 +175,7 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
 
 void Installer::update_apps(
   const var::Vector<AppUpdate> &app_list,
-  const Options &options) {
+  const Install &options) {
   for (const AppUpdate &app : app_list) {
     Project app_project(Project::Id(app.info().id()));
 
@@ -196,7 +197,7 @@ void Installer::update_apps(
         String(app_project.get_version()) + " from "
           + current_version.string_view());
 
-      install_id(Options(options)
+      install_id(Install(options)
                    .set_os(false)
                    .set_application()
                    .set_project_id(app_project.get_document_id())
@@ -216,7 +217,7 @@ void Installer::update_apps(
   }
 }
 
-void Installer::update_os(const Options &options) {
+void Installer::update_os(const Install &options) {
 
   Project os_project(Project::Id(connection()->info().id()));
 
@@ -235,7 +236,7 @@ void Installer::update_os(const Options &options) {
       "update",
       String(os_project.get_version()) + " from "
         + current_version.string_view());
-    return install_id(Options(options)
+    return install_id(Install(options)
                         .set_os()
                         .set_application(false)
                         .set_project_id(os_project.get_document_id())
@@ -250,14 +251,16 @@ void Installer::update_os(const Options &options) {
   }
 }
 
-void Installer::install_build(Build &build, const Options &options) {
+void Installer::install_build(Build &build, const Install &options) {
 
   if (build.decode_build_type() == Build::Type::application) {
+    CLOUD_PRINTER_TRACE("installing application build");
     install_application_build(build, options);
     return;
   }
 
   if (build.decode_build_type() == Build::Type::os) {
+    CLOUD_PRINTER_TRACE("installing os build");
     install_os_build(build, options);
     return;
   }
@@ -265,7 +268,7 @@ void Installer::install_build(Build &build, const Options &options) {
 
 void Installer::install_application_build(
   Build &build,
-  const Options &options) {
+  const Install &options) {
 
   DataFile image(OpenMode::read_write());
   image.data() = build.get_image(options.build_name());
@@ -286,10 +289,10 @@ void Installer::install_application_build(
 
   install_application_image(
     image,
-    Options(options).set_version(build.get_version()));
+    Install(options).set_version(build.get_version()));
 }
 
-void Installer::install_os_build(Build &build, const Options &options) {
+void Installer::install_os_build(Build &build, const Install &options) {
 
   // insert secret key
   if (options.is_insert_key()) {
@@ -373,7 +376,7 @@ void Installer::install_os_build(Build &build, const Options &options) {
   install_os_image(
     build,
     image,
-    Options(options).set_reconnect(
+    Install(options).set_reconnect(
       options.is_reconnect() || options.is_synchronize_thing()));
 
   if (is_success() && options.is_synchronize_thing()) {
@@ -398,13 +401,13 @@ void Installer::install_os_build(Build &build, const Options &options) {
 
 void Installer::install_application_image(
   const fs::FileObject &image,
-  const Options &options) {
+  const Install &options) {
 
   if (!options.destination().is_empty()) {
     save_image_locally(
       Build(Build::Construct()),
       image,
-      Options(options).set_application());
+      Install(options).set_application());
 
     return;
   }
@@ -481,10 +484,10 @@ void Installer::install_application_image(
 void Installer::install_os_image(
   const Build &build,
   const FileObject &image,
-  const Options &options) {
+  const Install &options) {
 
   if (!options.destination().is_empty()) {
-    save_image_locally(build, image, Options(options).set_os());
+    save_image_locally(build, image, Install(options).set_os());
     return;
   }
   {
@@ -530,7 +533,7 @@ void Installer::install_os_image(
   return;
 }
 
-void Installer::reconnect(const Options &options) {
+void Installer::reconnect(const Install &options) {
   CLOUD_PRINTER_TRACE(String().format(
     "reconnect %d retries at %dms intervals",
     options.retry_reconnect_count(),
@@ -555,7 +558,7 @@ void Installer::reconnect(const Options &options) {
 void Installer::save_image_locally(
   const Build &build,
   const fs::FileObject &image,
-  const Options &options) {
+  const Install &options) {
   if (!options.destination().is_empty()) {
     CLOUD_PRINTER_TRACE("saving image to " + options.destination());
     String destination;
