@@ -106,13 +106,19 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
   for (const swd::Elf::ProgramHeader &program_header : program_header_list) {
 
+    printer().object(
+      "programHeader",
+      program_header,
+      printer::Printer::Level::debug);
     const var::StringView name = elf.get_section_name(program_header);
 
     if (name == ".text" || name == ".data") {
+      CLOUD_PRINTER_TRACE("adding section text/data to build");
       data_image.write(
         elf.file().seek(program_header.offset()),
         File::Write().set_size(program_header.file_size()));
     } else {
+      CLOUD_PRINTER_TRACE("adding section " + name + " to build");
       section_list.push_back(SectionImageInfo(name).set_image_data(
         DataFile()
           .write(
@@ -239,6 +245,11 @@ Build &Build::import_compiled(const ImportCompiled &options) {
       local_build_image_list.push_back(
         image_info.set_name(build_directory_entry)
           .set_image_data(data_image.data()));
+
+      printer().object(
+        build_directory_entry,
+        local_build_image_list.back(),
+        printer::Printer::Level::debug);
     }
   }
 
