@@ -1,3 +1,5 @@
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
+
 #ifndef SERVICE_HPP
 #define SERVICE_HPP
 

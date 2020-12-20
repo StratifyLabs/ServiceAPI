@@ -1,3 +1,4 @@
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
 #include <sdk/types.h>
 
@@ -133,8 +134,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     .set_size(data_image.size())
     .set_secret_key_position(mcu_board_config.secret_key_address)
     .set_secret_key_size(mcu_board_config.secret_key_size)
-    .set_section_list(section_list)
-    .calculate_hash();
+    .set_section_list(section_list);
 }
 
 Build &Build::import_compiled(const ImportCompiled &options) {
@@ -246,9 +246,16 @@ Build &Build::import_compiled(const ImportCompiled &options) {
         image_info.set_name(build_directory_entry)
           .set_image_data(data_image.data()));
 
+      ImageInfo printable_info
+        = json::JsonObject().copy(local_build_image_list.back()).to_object();
+      printable_info.set_image("<image data>");
+      for (auto &section : printable_info.section_list()) {
+        section.set_image("<image data>");
+      }
+
       printer().object(
         build_directory_entry,
-        local_build_image_list.back(),
+        printable_info,
         printer::Printer::Level::debug);
     }
   }
@@ -303,17 +310,6 @@ Build &Build::insert_secret_key(
       StringView(secret_key_view.to_const_char(), secret_key_view.size()))
     .set_image_data(image_data);
 
-  return *this;
-}
-
-Build &Build::append_hash(const var::StringView build_name) {
-  ImageInfo image_info = build_image_info(build_name);
-  image_info.calculate_hash();
-
-  Vector<SectionImageInfo> section_info_list = image_info.section_list();
-  for (SectionImageInfo &section : section_info_list) {
-    section.calculate_hash();
-  }
   return *this;
 }
 
@@ -447,7 +443,7 @@ var::NameString Build::normalize_elf_name(
     = build_directory.get_substring_at_position(StringView("build_").length());
   result.append("_").append(build_name);
 
-  return result &= ".elf";
+  return result.append(".elf");
 }
 
 var::StringView Build::get_arch(const var::StringView name) {

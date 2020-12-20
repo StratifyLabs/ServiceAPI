@@ -1,3 +1,5 @@
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
+
 #ifndef SERVICE_API_SERVICE_BUILD_HPP
 #define SERVICE_API_SERVICE_BUILD_HPP
 
@@ -20,30 +22,6 @@ public:
     API_ACCESS_FUNDAMENTAL(SecretKeyInfo, u32, size, 0);
   };
 
-  class HashInfo {
-    API_ACCESS_COMPOUND(HashInfo, var::GeneralString, value);
-    API_ACCESS_FUNDAMENTAL(HashInfo, u32, size, 0);
-    API_ACCESS_FUNDAMENTAL(HashInfo, u32, padding, 0);
-
-  public:
-    HashInfo(const var::Data &image) {
-
-      const size_t image_size = image.size();
-      constexpr size_t hash_size = sizeof(crypto::Sha256::Hash);
-
-      size_t padding_length = hash_size - image_size % hash_size;
-      if (padding_length == hash_size) {
-        padding_length = 0;
-      }
-
-      set_value(var::View(crypto::Sha256().update(image).output())
-                  .to_string()
-                  .string_view())
-        .set_padding(padding_length)
-        .set_size(image.size());
-    }
-  };
-
   class SectionImageInfo : public json::JsonKeyValue {
   public:
     explicit SectionImageInfo(const var::StringView key)
@@ -53,24 +31,15 @@ public:
       : JsonKeyValue(key, object) {}
 
     JSON_ACCESS_STRING(SectionImageInfo, image);
-    JSON_ACCESS_STRING(SectionImageInfo, hash);
     JSON_ACCESS_INTEGER(SectionImageInfo, padding);
 
     var::Data get_image_data() const {
       return var::Base64()
-        .decode(var::StringView(get_image_cstring()))
-        .append(var::Data::from_string(get_hash()));
+        .decode(var::StringView(get_image_cstring()));
     }
 
     SectionImageInfo &set_image_data(var::View image_view) {
       return set_image(var::Base64().encode(image_view).string_view());
-    }
-
-    SectionImageInfo &calculate_hash() {
-      set_hash(var::View(crypto::Sha256().update(get_image_data()).output())
-                 .to_string()
-                 .string_view());
-      return *this;
     }
   };
 
@@ -102,18 +71,6 @@ public:
 
     ImageInfo &set_image_data(const var::View &image_view) {
       return set_image(var::Base64().encode(image_view));
-    }
-
-    ImageInfo &calculate_hash() {
-      set_hash(var::View(crypto::Sha256().update(get_image_data()).output())
-                 .to_string()
-                 .string_view());
-      auto section_list = get_section_list();
-      for (auto &section : section_list) {
-        section.calculate_hash();
-      }
-
-      return *this;
     }
 
     bool operator==(const ImageInfo &info) const {
@@ -236,8 +193,6 @@ public:
     const var::StringView build_name,
     const var::View secret_key);
 
-  Build &append_hash(const var::StringView build_name);
-
   bool is_build_image_included() const {
     // buildIncludesImage is a legacy support thing
     return is_image_included()
@@ -276,7 +231,7 @@ protected:
   void interface_save() override;
 
 private:
-  var::NameString m_application_architecture;
+  var::KeyString m_application_architecture;
 
   Document::Path create_storage_path(const var::StringView build_name) const {
     return Document::Path("builds") / get_project_id() / id()

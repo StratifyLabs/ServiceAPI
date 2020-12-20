@@ -1,3 +1,5 @@
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
+
 #include <chrono.hpp>
 #include <fs.hpp>
 #include <json.hpp>
@@ -275,9 +277,7 @@ void Installer::install_application_build(
 
   if (image.size() == 0) {
     API_RETURN_ASSIGN_ERROR(
-      StringView(
-        "could not find build `" + options.build_name().get_string() + "`")
-        .get_string()
+      ("could not find build `" + options.build_name().to_string() + "`")
         .cstring(),
       ENOENT);
   }
@@ -288,7 +288,8 @@ void Installer::install_application_build(
   printer().key("version", build.get_version());
 
   if (options.is_append_hash()) {
-    crypto::Sha256::append_aligned_hash(image);
+    const auto hash = crypto::Sha256::append_aligned_hash(image);
+    printer().key("hash", View(hash).to_string());
   }
 
   install_application_image(
@@ -346,11 +347,6 @@ void Installer::install_os_build(Build &build, const Install &options) {
       secret_key.get_substring_with_length(secret_key.length() / 2));
   }
 
-  // append hash
-  if (options.is_append_hash()) {
-    build.append_hash(options.build_name());
-  }
-
   if (fs::Path::suffix(options.destination()) == "json") {
     Link::Path link_path(options.destination(), connection()->driver());
 
@@ -372,7 +368,9 @@ void Installer::install_os_build(Build &build, const Install &options) {
   image.data() = build.get_image(options.build_name());
 
   if (options.is_append_hash()) {
-    crypto::Sha256::append_aligned_hash(image);
+    const crypto::Sha256::Hash hash
+      = crypto::Sha256::append_aligned_hash(image);
+    printer().key("osHash", View(hash).to_string());
   }
 
   printer().key(
@@ -596,7 +594,10 @@ void Installer::save_image_locally(
         destination = link_path.path();
       }
 
-      auto append_hash = [](Data &&image_data, bool is_append_hash) -> Data {
+      auto append_hash = [&](
+                           Data &&image_data,
+                           const StringView name,
+                           bool is_append_hash) -> Data {
         if (is_append_hash == false) {
           return image_data;
         } else {
@@ -605,22 +606,20 @@ void Installer::save_image_locally(
                               .write(ViewFile(image_data))
                               .move();
 
-          crypto::Sha256::append_aligned_hash(hashed);
+          crypto::Sha256::Hash hash
+            = crypto::Sha256::append_aligned_hash(hashed);
+          printer().key(name & "Hash", View(hash).to_string());
+
           return hashed.data();
         }
       };
 
-      CLOUD_PRINTER_TRACE("save binary file on host " & destination);
-      File(File::IsOverwrite::yes, destination)
-        .write(append_hash(
-          std::move(DataFile()
-                      .reserve(image.size() + sizeof(crypto::Sha256::Hash) * 2)
-                      .write(image.seek(0))
-                      .data()),
-          options.is_append_hash()));
-
       Printer::Object sections_object(printer(), "sections");
       printer().key(".text", "host@" & destination);
+
+      CLOUD_PRINTER_TRACE("save binary file on host " & destination);
+      // hash for image was previously added
+      File(File::IsOverwrite::yes, destination).write(image);
 
       JsonKeyValueList<Build::SectionImageInfo> section_image_info
         = build.build_image_info(options.build_name()).get_section_list();
@@ -635,6 +634,7 @@ void Installer::save_image_locally(
           File(File::IsOverwrite::yes, section_destination)
             .write(append_hash(
               image_info.get_image_data(),
+              image_info.key(),
               options.is_append_hash()));
         }
       }
