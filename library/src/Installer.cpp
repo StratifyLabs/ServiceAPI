@@ -292,6 +292,7 @@ void Installer::install_application_build(
     printer().key("hash", View(hash).to_string());
   }
 
+  CLOUD_PRINTER_TRACE("installing application image");
   install_application_image(
     image.seek(0),
     Install(options).set_version(build.get_version()));
@@ -410,14 +411,31 @@ void Installer::install_application_image(
   const Install &options) {
 
   if (!options.destination().is_empty()) {
+    CLOUD_PRINTER_TRACE("save locally");
     save_image_locally(
       Build(Build::Construct()),
       image,
       Install(options).set_application());
-
     return;
   }
 
+  CLOUD_PRINTER_TRACE("check flash available");
+  const bool is_flash_available
+    = options.is_flash() ? Appfs(connection()->driver()).is_flash_available()
+                         : false;
+
+  API_RETURN_IF_ERROR();
+
+  if (
+    !is_flash_available
+    && (options.destination().is_empty() || (options.destination().find("/app") == 0))
+    && Appfs(connection()->driver()).is_ram_available() == false) {
+    // no RAM and no Flash
+    CLOUD_PRINTER_TRACE("no flash or ram");
+    API_RETURN_ASSIGN_ERROR("device@/app/.install", ENOENT);
+  }
+
+  CLOUD_PRINTER_TRACE("check is running " & project_name());
   int app_pid
     = sos::TaskManager("", connection()->driver()).get_pid(project_name());
   if (options.is_kill()) {
@@ -434,12 +452,6 @@ void Installer::install_application_image(
   if (options.is_clean()) {
     clean_application();
   }
-
-  const bool is_flash_available
-    = options.is_flash() ? Appfs(connection()->driver()).is_flash_available()
-                         : false;
-
-  API_RETURN_IF_ERROR();
 
   sys::Version version(options.version());
 
