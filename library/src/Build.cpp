@@ -86,7 +86,7 @@ Build::Build(const Construct &options)
 
 Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   File elf_file(path);
-  swd::Elf elf(&elf_file);
+  swd::Elf elf(elf_file);
 
   DataFile data_image;
   mcu_board_config_t mcu_board_config = {0};
