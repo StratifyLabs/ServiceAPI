@@ -111,7 +111,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
       "programHeader",
       program_header,
       printer::Printer::Level::debug);
-    const var::StringView name = elf.get_section_name(program_header);
+    const auto name = elf.get_section_name(program_header);
 
     if (name == ".text" || name == ".data") {
       CLOUD_PRINTER_TRACE("adding section text/data to build");
