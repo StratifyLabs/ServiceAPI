@@ -106,18 +106,21 @@ Project &Project::save_build(const SaveBuild &options) {
 
   // add the README if it is available
 
-  const PathString readme_path
-    = PathString(options.project_path()) / "README.md";
-  bool is_readme_available = FileSystem().exists(readme_path);
-  DataFile readme = DataFile().write(File(readme_path), Base64Encoder()).move();
-  if (!is_readme_available) {
-    API_RESET_ERROR();
+  {
+    const PathString readme_path
+      = PathString(options.project_path()) / "README.md";
+    const bool is_readme_available = FileSystem().exists(readme_path);
+    if (is_readme_available) {
+      DataFile readme
+        = DataFile().write(File(readme_path), Base64Encoder()).move();
+      CLOUD_PRINTER_TRACE("setting readme to " + readme.data().string_view());
+      set_readme(readme.data().string_view());
+    }
   }
 
   crypto::Aes::Key key;
 
-  set_readme(readme.data().string_view());
-  build.set_readme(readme.data().string_view())
+  build.set_readme(get_readme())
     .set_description(options.change_description())
     .set_version(version.string_view())
     .set_team_id(get_team_id())
@@ -126,7 +129,7 @@ Project &Project::save_build(const SaveBuild &options) {
     .set_iv(key.get_initialization_vector_string())
     .save();
 
-  printer().object("buildUpload", build);
+  printer().object("buildUpload", build, printer::Printer::Level::trace);
 
   BuildList project_build_list = get_build_list();
 
@@ -138,7 +141,12 @@ Project &Project::save_build(const SaveBuild &options) {
   save();
 
   printer().object("projectUpload", to_object());
-  remove_readme();
+
+  {
+    // readme may not be present so ignore the error
+    api::ErrorGuard error_guard;
+    remove_readme();
+  }
 
   return *this;
 }

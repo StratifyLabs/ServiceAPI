@@ -119,7 +119,7 @@ Document &Document::import_binary_file_to_base64(
 }
 
 void Document::convert_tags_to_list() {
-  StringView tags(to_object().at("tags").to_cstring());
+  StringView tags(to_object().at("tags").to_string_view());
   if (tags.is_empty() == false) {
     set_tag_list(tags.split(","));
     to_object().remove("tags");
@@ -128,7 +128,7 @@ void Document::convert_tags_to_list() {
 
 void Document::sanitize_tag_list() {
   var::StringViewList list = get_tag_list();
-  var::StringViewList sanitized_list;
+  var::StringList sanitized_list;
 
   for (const auto &item : list) {
     bool is_present = false;
