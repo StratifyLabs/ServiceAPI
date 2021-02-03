@@ -84,6 +84,8 @@ public:
 
   const Path &path() const { return m_path; }
 
+  bool is_existing() const { return m_is_existing; }
+
 protected:
   Document &
   import_binary_file_to_base64(var::StringView path, const var::StringView key);

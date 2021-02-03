@@ -38,6 +38,7 @@ Document::list(var::StringView path, var::StringView mask) {
 Document::Document(const var::StringView path, const Id &id)
   : m_path(path), m_id(id) {
   if (id.is_empty() == false) {
+    api::ErrorGuard error_guard;
     to_object() = cloud().get_document(Path(path) / id);
     m_is_existing = is_success();
   }
@@ -62,15 +63,15 @@ void Document::interface_save() {
     get_permissions() == "public" || get_permissions() == "private"
     || get_permissions() == "searchable");
 
-  if (get_document_id().is_empty()) {
-    const var::KeyString result = cloud().create_document(
+  if (get_document_id().is_empty() || !m_is_existing) {
+    const auto result = cloud().create_document(
       path().string_view(),
       to_object(),
-      id().string_view());
+      get_document_id());
 
     if (result != "") {
       // once document is uploaded it should be modified to include the id
-      m_id = result.cstring();
+      m_id = result;
     } else {
       JsonObject error
         = JsonDocument().from_string(cloud().document_error()).to_object();
