@@ -49,11 +49,14 @@ void Document::interface_save() {
   API_RETURN_IF_ERROR();
   set_timestamp(DateTime::get_system_time().ctime());
   set_user_id(cloud().credentials().get_uid_cstring());
-  convert_tags_to_list(); // tags -> tagList
-  sanitize_tag_list();    // remove any tag duplicates
-  API_RESET_ERROR();
+  {
+    api::ErrorGuard error_guard;
+    convert_tags_to_list(); // tags -> tagList
+    sanitize_tag_list();    // remove any tag duplicates
+  }
 
   if (get_team_id() == "") {
+    CLOUD_PRINTER_TRACE("no team specified, ensure `team` entry");
     // this will ensure 'team' is present in the object
     // get_team_id() can be "" if not present or if ""
     set_team_id("");
@@ -64,15 +67,19 @@ void Document::interface_save() {
     || get_permissions() == "searchable");
 
   if (get_document_id().is_empty() || !m_is_existing) {
+    CLOUD_PRINTER_TRACE("document path is " | path().string_view());
+    CLOUD_PRINTER_TRACE("creating new document with id: " | get_document_id());
     const auto result = cloud().create_document(
       path().string_view(),
       to_object(),
       get_document_id());
 
+    CLOUD_PRINTER_TRACE("new document id is " | result);
     if (result != "") {
       // once document is uploaded it should be modified to include the id
       m_id = result;
     } else {
+      CLOUD_PRINTER_TRACE("there was an error creating the document");
       JsonObject error
         = JsonDocument().from_string(cloud().document_error()).to_object();
       if (
