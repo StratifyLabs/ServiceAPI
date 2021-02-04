@@ -120,6 +120,7 @@ Project &Project::save_build(const SaveBuild &options) {
 
   crypto::Aes::Key key;
 
+  CLOUD_PRINTER_TRACE("Creating and saving the build to the cloud");
   build.set_readme(get_readme())
     .set_description(options.change_description())
     .set_version(version.string_view())
@@ -138,6 +139,7 @@ Project &Project::save_build(const SaveBuild &options) {
 
   set_build_list(project_build_list);
 
+  CLOUD_PRINTER_TRACE("Saving the project document");
   save();
 
   printer().object("projectUpload", to_object());

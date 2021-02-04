@@ -41,12 +41,31 @@ Document::Document(const var::StringView path, const Id &id)
     api::ErrorGuard error_guard;
     to_object() = cloud().get_document(Path(path) / id);
     m_is_existing = is_success();
+    CLOUD_PRINTER_TRACE(
+      "document " | (Path(path) / id).string_view() | " exists? "
+      | (m_is_existing ? "true" : "false"));
   }
 }
 
 void Document::interface_save() {
-
   API_RETURN_IF_ERROR();
+
+  if (m_is_imported) {
+    // check to see if doc exists
+    m_is_imported = false;
+    if (get_document_id().is_empty() == false) {
+      api::ErrorGuard error_guard;
+      to_object() = cloud().get_document(Path(path()) / get_document_id());
+      m_is_existing = is_success();
+    }
+  }
+
+  CLOUD_PRINTER_TRACE(
+    "saving document to cloud " | path().string_view() | " id: "
+    | get_document_id());
+  CLOUD_PRINTER_TRACE(
+    "is existing? "
+    | (is_existing() ? StringView("true") : StringView("false")));
   set_timestamp(DateTime::get_system_time().ctime());
   set_user_id(cloud().credentials().get_uid_cstring());
   {
@@ -104,6 +123,7 @@ void Document::interface_import_file(const fs::File &file) {
   to_object() = JsonDocument().load(file);
   m_id = get_document_id();
   convert_tags_to_list(); // tags -> tagList
+  m_is_imported = true;
 }
 
 void Document::interface_export_file(const fs::File &file) const {

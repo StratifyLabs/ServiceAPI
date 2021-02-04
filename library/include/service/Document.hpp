@@ -105,6 +105,7 @@ private:
   Path m_path;
   Id m_id;
   bool m_is_existing = false;
+  bool m_is_imported = false;
 
   Path get_path_with_id() const {
     return Path(path()).append("/").append(id());
