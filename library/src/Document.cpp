@@ -120,10 +120,13 @@ void Document::interface_save() {
 }
 
 void Document::interface_import_file(const fs::File &file) {
-  to_object() = JsonDocument().load(file);
+  JsonDocument json_document;
+  to_object() = json_document.load(file);
+  if( is_error() ){
+      printer().object("json load error", json_document.error(), printer::Printer::Level::trace);
+  }
   m_id = get_document_id();
   convert_tags_to_list(); // tags -> tagList
-  m_is_imported = true;
 }
 
 void Document::interface_export_file(const fs::File &file) const {
@@ -147,6 +150,7 @@ Document &Document::import_binary_file_to_base64(
 }
 
 void Document::convert_tags_to_list() {
+    api::ErrorGuard error_guard;
   StringView tags(to_object().at("tags").to_string_view());
   if (tags.is_empty() == false) {
     set_tag_list(tags.split(","));

@@ -26,10 +26,10 @@ Build::Build(const Construct &options)
 
   if (options.project_path().is_empty() == false) {
     CLOUD_PRINTER_TRACE("import compiled project at " & options.project_path());
-
     import_compiled(ImportCompiled()
                       .set_path(options.project_path())
                       .set_build(options.build_name()));
+    CLOUD_PRINTER_TRACE("done importing " | options.project_path());
     return;
   }
 
@@ -88,6 +88,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   File elf_file(path);
   swd::Elf elf(elf_file);
 
+  CLOUD_PRINTER_TRACE("importing ELF file " | path);
   DataFile data_image;
   mcu_board_config_t mcu_board_config = {0};
   json::JsonKeyValueList<SectionImageInfo> section_list;
@@ -102,6 +103,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     = symbol_list.find(swd::Elf::Symbol("mcu_board_config"));
 
   if (mcu_board_config_symbol.size()) {
+      CLOUD_PRINTER_TRACE("loading mcu board config (deprecated in v4)");
     elf.load(mcu_board_config_symbol, ViewFile(var::View(mcu_board_config)));
   }
 
@@ -129,6 +131,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     }
   }
 
+  CLOUD_PRINTER_TRACE("loaded " | NumberString(section_list.count()) | " additional sections");
   return Build::ImageInfo()
     .set_image_data(data_image.data())
     .set_size(data_image.size())
@@ -139,11 +142,14 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
 Build &Build::import_compiled(const ImportCompiled &options) {
 
+    const auto project_settings_path = options.path() / Project::file_name();
+    CLOUD_PRINTER_TRACE("import " | project_settings_path.string_view());
   Project project_settings
-    = Project().import_file(File(options.path() / Project::file_name()));
+    = Project().import_file(File(project_settings_path));
 
   API_RETURN_VALUE_IF_ERROR(*this);
 
+  CLOUD_PRINTER_TRACE("checking for path and project name match");
   if (fs::Path::name(options.path()) != project_settings.get_name()) {
     API_RETURN_VALUE_ASSIGN_ERROR(
       *this,
@@ -152,17 +158,22 @@ Build &Build::import_compiled(const ImportCompiled &options) {
       EINVAL);
   }
 
+  CLOUD_PRINTER_TRACE("importing build entries from the project");
   set_name(project_settings.get_name())
     .set_project_id(project_settings.get_document_id())
     .set_version(project_settings.get_version())
     .set_type(project_settings.get_type())
     .set_permissions(project_settings.get_permissions());
 
+  CLOUD_PRINTER_TRACE("build type is " | get_type());
+
+
   if (get_permissions().is_empty()) {
+      CLOUD_PRINTER_TRACE("Setting default permissions to public");
     set_permissions("public");
   }
 
-  set_ram_size(project_settings.get_ram_size_cstring());
+  set_ram_size(project_settings.get_ram_size());
   set_image_included(true);
 
   // check for a valid build name if provided
@@ -170,11 +181,12 @@ Build &Build::import_compiled(const ImportCompiled &options) {
     const PathString build_path
       = options.path() / normalize_name(options.build()).string_view();
     if (FileSystem().exists(build_path) == false) {
+        CLOUD_PRINTER_TRACE("build name provided but doesn't exist");
       API_RETURN_VALUE_ASSIGN_ERROR(*this, build_path.cstring(), ENOENT);
     }
   }
 
-  fs::PathList build_directory_list
+  const auto build_directory_list
     = FileSystem().read_directory(options.path());
 
   Vector<ImageInfo> local_build_image_list;
@@ -260,6 +272,7 @@ Build &Build::import_compiled(const ImportCompiled &options) {
     }
   }
 
+  CLOUD_PRINTER_TRACE("Update build image list with " | NumberString(local_build_image_list.count()) | " items");
   set_build_image_list(local_build_image_list);
 
   return *this;

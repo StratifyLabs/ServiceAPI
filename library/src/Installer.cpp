@@ -16,6 +16,7 @@ Installer::Installer(sos::Link *link_connection)
   : m_connection(link_connection) {}
 
 Installer &Installer::install(const Install &options) {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   if (connection()->is_connected_and_is_not_bootloader()) {
     set_architecture(connection()->info().architecture());
@@ -72,6 +73,7 @@ void Installer::install_url(const Install &options) {
 }
 
 void Installer::install_id(const Install &options) {
+  API_RETURN_IF_ERROR();
   Project p(Project::Id(options.project_id()));
   set_project_name(p.get_name());
   set_project_id(p.get_document_id());
@@ -128,19 +130,24 @@ void Installer::install_path(const Install &options) {
             .set_build_name(options.build_name())
             .set_architecture(architecture()));
 
+  CLOUD_PRINTER_TRACE("setting installer project id to " | b.get_project_id());
   set_project_id(b.get_project_id());
   set_project_name(fs::Path::name(options.project_path()));
+  CLOUD_PRINTER_TRACE("setting installer project name to " | project_name());
 
   if (
     b.decode_build_type() == Build::Type::application
     && !options.is_application()) {
+      CLOUD_PRINTER_TRACE("project type != application");
     API_RETURN_ASSIGN_ERROR("app type mismatch", false);
   }
 
   if (b.decode_build_type() == Build::Type::os && !options.is_os()) {
+      CLOUD_PRINTER_TRACE("project type != os");
     API_RETURN_ASSIGN_ERROR("os type mismatch", false);
   }
 
+  CLOUD_PRINTER_TRACE("installing the build");
   install_build(b, options);
 }
 
@@ -254,7 +261,8 @@ void Installer::update_os(const Install &options) {
 }
 
 void Installer::install_build(Build &build, const Install &options) {
-
+    API_RETURN_IF_ERROR();
+    CLOUD_PRINTER_TRACE("Installing build type " | build.get_type());
   if (build.decode_build_type() == Build::Type::application) {
     CLOUD_PRINTER_TRACE("installing application build");
     install_application_build(build, options);
@@ -266,6 +274,8 @@ void Installer::install_build(Build &build, const Install &options) {
     install_os_build(build, options);
     return;
   }
+
+  CLOUD_PRINTER_TRACE("build type was not recognized " | build.get_type());
 }
 
 void Installer::install_application_build(
