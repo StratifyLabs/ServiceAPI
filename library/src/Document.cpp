@@ -55,7 +55,7 @@ void Document::interface_save() {
     m_is_imported = false;
     if (get_document_id().is_empty() == false) {
       api::ErrorGuard error_guard;
-      to_object() = cloud().get_document(Path(path()) / get_document_id());
+      cloud().get_document(Path(path()) / get_document_id());
       m_is_existing = is_success();
     }
   }

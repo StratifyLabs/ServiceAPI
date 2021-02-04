@@ -132,11 +132,9 @@ Project &Project::save_build(const SaveBuild &options) {
 
   printer().object("buildUpload", build, printer::Printer::Level::trace);
 
-  BuildList project_build_list = get_build_list();
-
+  auto project_build_list = get_build_list();
   project_build_list.push_back(
     BuildItem(build.id()).set_version(version.string_view()));
-
   set_build_list(project_build_list);
 
   CLOUD_PRINTER_TRACE("Saving the project document");
