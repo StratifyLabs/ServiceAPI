@@ -340,7 +340,7 @@ void Installer::install_os_build(Build &build, const Install &options) {
     if (existing_secret_key.is_empty() && !options.is_rekey_thing()) {
       CLOUD_PRINTER_TRACE("getting secret key from cloud");
       Thing thing(Sys::Info(connection()->info().sys_info()));
-      if (thing.is_error()) {
+      if (thing.is_existing() == false) {
         // no thing there
         API_RETURN_ASSIGN_ERROR("secret key not accessible", EPERM);
       }
