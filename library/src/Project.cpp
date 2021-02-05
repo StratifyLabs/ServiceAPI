@@ -65,15 +65,12 @@ Project &Project::save_build(const SaveBuild &options) {
     printer().key("id", id().string_view());
 
     Build::Type type = Build::decode_build_type(get_type());
-    const StringView type_command = (type == Build::Type::os) ? "os" : "app";
+    const char * type_command = (type == Build::Type::os) ? "os" : "app";
     printer().key(
       "tip",
       String().format(
-        "build project with `sl %s.build:path=%s` then use `sl "
-        "%s.publish:path=%s,changes=<change description>`",
-        String(type_command).cstring(),
-        String(options.project_path()).cstring(),
-        String(type_command).cstring(),
+        "use `sl %s.publish:path=%s,header` to export settings to `sl_config.h`",
+        type_command,
         String(options.project_path()).cstring()));
     return *this;
   }

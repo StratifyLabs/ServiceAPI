@@ -229,6 +229,7 @@ public:
 
 protected:
   void interface_save() override;
+  void interface_remove() override;
 
 private:
   var::KeyString m_application_architecture;

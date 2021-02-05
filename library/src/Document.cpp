@@ -41,31 +41,48 @@ Document::Document(const var::StringView path, const Id &id)
     api::ErrorGuard error_guard;
     to_object() = cloud().get_document(Path(path) / id);
     m_is_existing = is_success();
+    m_is_imported = false;
     CLOUD_PRINTER_TRACE(
       "document " | (Path(path) / id).string_view() | " exists? "
       | (m_is_existing ? "true" : "false"));
   }
 }
 
-void Document::interface_save() {
-  API_RETURN_IF_ERROR();
-
+void Document::update_is_existing() {
   if (m_is_imported) {
     // check to see if doc exists
+    CLOUD_PRINTER_TRACE("checking if " | get_document_id() | " exists");
     m_is_imported = false;
     if (get_document_id().is_empty() == false) {
+      CLOUD_PRINTER_TRACE("Checking to see if " | get_document_id() | " exists in the cloud");
       api::ErrorGuard error_guard;
-      cloud().get_document(Path(path()) / get_document_id());
+      cloud().get_document(get_path_with_id());
       m_is_existing = is_success();
+      CLOUD_PRINTER_TRACE(get_document_id() | " exists? " | (m_is_existing ? "true" : "false"));
     }
   }
+}
+
+void Document::interface_remove() {
+  update_is_existing();
+  if (is_existing()) {
+    cloud().remove_document(get_path_with_id());
+    m_is_existing = false;
+  }
+}
+
+void Document::interface_save() {
+  API_RETURN_IF_ERROR();
 
   CLOUD_PRINTER_TRACE(
     "saving document to cloud " | path().string_view() | " id: "
     | get_document_id());
+  update_is_existing();
+
   CLOUD_PRINTER_TRACE(
     "is existing? "
     | (is_existing() ? StringView("true") : StringView("false")));
+
   set_timestamp(DateTime::get_system_time().ctime());
   set_user_id(cloud().credentials().get_uid_cstring());
   {
@@ -85,7 +102,7 @@ void Document::interface_save() {
     get_permissions() == "public" || get_permissions() == "private"
     || get_permissions() == "searchable");
 
-  if (get_document_id().is_empty() || !m_is_existing) {
+  if (get_document_id().is_empty() || !is_existing()) {
     CLOUD_PRINTER_TRACE("document path is " | path().string_view());
     CLOUD_PRINTER_TRACE("creating new document with id: " | get_document_id());
     const auto result = cloud().create_document(
@@ -113,6 +130,7 @@ void Document::interface_save() {
   }
 
   // add keys from object to update mask
+  CLOUD_PRINTER_TRACE("patching document with id " | id());
   cloud().document_update_mask_fields().clear();
   set_document_id(id());
   cloud().patch_document(get_path_with_id().string_view(), to_object());

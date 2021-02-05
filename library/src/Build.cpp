@@ -103,7 +103,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     = symbol_list.find(swd::Elf::Symbol("mcu_board_config"));
 
   if (mcu_board_config_symbol.size()) {
-      CLOUD_PRINTER_TRACE("loading mcu board config (deprecated in v4)");
+    CLOUD_PRINTER_TRACE("loading mcu board config (deprecated in v4)");
     elf.load(mcu_board_config_symbol, ViewFile(var::View(mcu_board_config)));
   }
 
@@ -131,7 +131,8 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     }
   }
 
-  CLOUD_PRINTER_TRACE("loaded " | NumberString(section_list.count()) | " additional sections");
+  CLOUD_PRINTER_TRACE(
+    "loaded " | NumberString(section_list.count()) | " additional sections");
   return Build::ImageInfo()
     .set_image_data(data_image.data())
     .set_size(data_image.size())
@@ -142,10 +143,9 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
 Build &Build::import_compiled(const ImportCompiled &options) {
 
-    const auto project_settings_path = options.path() / Project::file_name();
-    CLOUD_PRINTER_TRACE("import " | project_settings_path.string_view());
-  Project project_settings
-    = Project().import_file(File(project_settings_path));
+  const auto project_settings_path = options.path() / Project::file_name();
+  CLOUD_PRINTER_TRACE("import " | project_settings_path.string_view());
+  Project project_settings = Project().import_file(File(project_settings_path));
 
   API_RETURN_VALUE_IF_ERROR(*this);
 
@@ -167,9 +167,8 @@ Build &Build::import_compiled(const ImportCompiled &options) {
 
   CLOUD_PRINTER_TRACE("build type is " | get_type());
 
-
   if (get_permissions().is_empty()) {
-      CLOUD_PRINTER_TRACE("Setting default permissions to public");
+    CLOUD_PRINTER_TRACE("Setting default permissions to public");
     set_permissions("public");
   }
 
@@ -181,13 +180,12 @@ Build &Build::import_compiled(const ImportCompiled &options) {
     const PathString build_path
       = options.path() / normalize_name(options.build()).string_view();
     if (FileSystem().exists(build_path) == false) {
-        CLOUD_PRINTER_TRACE("build name provided but doesn't exist");
+      CLOUD_PRINTER_TRACE("build name provided but doesn't exist");
       API_RETURN_VALUE_ASSIGN_ERROR(*this, build_path.cstring(), ENOENT);
     }
   }
 
-  const auto build_directory_list
-    = FileSystem().read_directory(options.path());
+  const auto build_directory_list = FileSystem().read_directory(options.path());
 
   Vector<ImageInfo> local_build_image_list;
   for (const auto &build_directory_entry : build_directory_list) {
@@ -272,7 +270,9 @@ Build &Build::import_compiled(const ImportCompiled &options) {
     }
   }
 
-  CLOUD_PRINTER_TRACE("Update build image list with " | NumberString(local_build_image_list.count()) | " items");
+  CLOUD_PRINTER_TRACE(
+    "Update build image list with "
+    | NumberString(local_build_image_list.count()) | " items");
   set_build_image_list(local_build_image_list);
 
   return *this;
@@ -292,7 +292,7 @@ Build &Build::import_url(const var::StringView url) {
 }
 
 var::Data Build::get_image(const var::StringView name) const {
-	return build_image_info(name).get_image_data();
+  return build_image_info(name).get_image_data();
 }
 
 Build &Build::set_image(const var::StringView name, const var::Data &image) {
@@ -324,6 +324,39 @@ Build &Build::insert_secret_key(
     .set_image_data(image_data);
 
   return *this;
+}
+
+void Build::interface_remove() {
+  // delete the storage objects associated with the build
+
+#if CAN_DELETE_OBJECTS
+  // right now storage objects do not have permissions for deletion
+
+  // is this an old-style build commit
+  json::JsonArray array = at("buildList");
+  if (array.count() && array.at(0).is_string()) {
+    CLOUD_PRINTER_TRACE("using legacy build list");
+    for (u32 i = 0; i < array.count(); i++) {
+      api::ErrorGuard error_guard;
+      const auto path = create_storage_path(array.at(i).to_string_view());
+      CLOUD_PRINTER_TRACE(
+        "Removing legacy build storage " | path.string_view());
+      cloud().remove_storage_object(path.string_view());
+    }
+  } else {
+    const auto list = get_build_image_list();
+    for (const ImageInfo &build_image_info : list) {
+      api::ErrorGuard error_guard;
+      const auto path = create_storage_path(build_image_info.get_name());
+      CLOUD_PRINTER_TRACE("Removing build storage " | path.string_view());
+      cloud().remove_storage_object(path.string_view());
+    }
+  }
+  API_RETURN_IF_ERROR();
+#endif
+
+  CLOUD_PRINTER_TRACE("Removing build document");
+  Document::interface_remove();
 }
 
 void Build::interface_save() {

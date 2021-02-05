@@ -7,6 +7,7 @@
 #include <crypto/Random.hpp>
 #include <json/Json.hpp>
 #include <printer/Printer.hpp>
+#include <var/StackString.hpp>
 #include <var/String.hpp>
 
 namespace service {
@@ -97,6 +98,7 @@ protected:
   void interface_import_file(const fs::File &file);
   void interface_export_file(const fs::File &file) const;
   virtual void interface_save();
+  virtual void interface_remove();
 
 protected:
   void set_id(const var::StringView id) { m_id = id; }
@@ -105,7 +107,7 @@ private:
   Path m_path;
   Id m_id;
   bool m_is_existing = false;
-  bool m_is_imported = false;
+  bool m_is_imported = true;
 
   Path get_path_with_id() const {
     return Path(path()).append("/").append(id());
@@ -125,6 +127,8 @@ private:
 
   var::Vector<json::JsonObject>
   list(var::StringView path, var::StringView mask);
+
+  void update_is_existing();
 };
 
 template <class Derived> class DocumentAccess : public Document {
@@ -134,6 +138,11 @@ public:
 
   Derived &export_file(const fs::File &a) {
     interface_export_file(a);
+    return static_cast<Derived &>(*this);
+  }
+
+  Derived &remove() {
+    interface_remove();
     return static_cast<Derived &>(*this);
   }
 
