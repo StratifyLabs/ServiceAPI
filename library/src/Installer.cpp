@@ -6,6 +6,7 @@
 #include <printer.hpp>
 #include <sos.hpp>
 #include <var.hpp>
+#include <crypto.hpp>
 
 #include "service/Installer.hpp"
 #include "service/Thing.hpp"
@@ -328,13 +329,16 @@ void Installer::install_os_build(Build &build, const Install &options) {
      */
 
     StringView existing_secret_key = options.secret_key();
+    CLOUD_PRINTER_TRACE("existing key is `" | options.secret_key() | "`");
 
     StringView thing_team = connection()->info().team_id();
     if (thing_team.is_empty()) {
       thing_team = options.team_id();
     }
 
-    if (options.secret_key().is_empty() && !options.is_rekey_thing()) {
+
+    if (existing_secret_key.is_empty() && !options.is_rekey_thing()) {
+      CLOUD_PRINTER_TRACE("getting secret key from cloud");
       Thing thing(Sys::Info(connection()->info().sys_info()));
       if (thing.is_error()) {
         // no thing there
@@ -342,8 +346,12 @@ void Installer::install_os_build(Build &build, const Install &options) {
       }
 
       existing_secret_key = thing.get_secret_key();
+      CLOUD_PRINTER_TRACE("got secret key `" | options.secret_key() | "`");
     }
 
+
+    CLOUD_PRINTER_TRACE("using key `" | existing_secret_key | "`");
+    //if existing_secret_key secret key is empty, insert_secret_key() generates a key
     build.insert_secret_key(
       options.build_name(),
       var::Data::from_string(existing_secret_key));

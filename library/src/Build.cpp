@@ -90,6 +90,15 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
   CLOUD_PRINTER_TRACE("importing ELF file " | path);
   DataFile data_image;
+
+  typedef struct MCU_PACK {
+    u32 address;
+    u32 size;
+  } secret_key_t;
+
+  secret_key_t key = {0};
+
+  // using the legacy approach
   mcu_board_config_t mcu_board_config = {0};
   json::JsonKeyValueList<SectionImageInfo> section_list;
 
@@ -105,8 +114,23 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   if (mcu_board_config_symbol.size()) {
     CLOUD_PRINTER_TRACE("loading mcu board config (deprecated in v4)");
     elf.load(mcu_board_config_symbol, ViewFile(var::View(mcu_board_config)));
+    key.address = mcu_board_config.secret_key_address;
+    key.size = mcu_board_config.secret_key_size;
+  } else {
+    CLOUD_PRINTER_TRACE("no mcu_board_config find sos_config");
+
+    swd::Elf::Symbol sos_config_symbol
+      = symbol_list.find(swd::Elf::Symbol("sos_config"));
+
+    if (sos_config_symbol.size()) {
+      CLOUD_PRINTER_TRACE("found sos_config " | NumberString(sos_config_symbol.size()) | ", loading key data ");
+      elf.load(sos_config_symbol, ViewFile(View(key)));
+    }
   }
 
+  CLOUD_PRINTER_TRACE("key size is " | NumberString(key.size));
+
+  u32 text_start_location = 0;
   for (const swd::Elf::ProgramHeader &program_header : program_header_list) {
 
     printer().object(
@@ -116,6 +140,9 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     const auto name = elf.get_section_name(program_header);
 
     if (name == ".text" || name == ".data") {
+      if( name == ".text" ){
+        text_start_location = program_header.physical_address();
+      }
       CLOUD_PRINTER_TRACE("adding section text/data to build");
       data_image.write(
         elf.file().seek(program_header.offset()),
@@ -136,13 +163,13 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   return Build::ImageInfo()
     .set_image_data(data_image.data())
     .set_size(data_image.size())
-    .set_secret_key_position(mcu_board_config.secret_key_address)
-    .set_secret_key_size(mcu_board_config.secret_key_size)
+    .set_secret_key_position((key.address - text_start_location) & ~0x01)
+    .set_secret_key_size(key.size)
     .set_section_list(section_list);
 }
 
 Build &Build::import_compiled(const ImportCompiled &options) {
-
+  API_RETURN_VALUE_IF_ERROR(*this);
   const auto project_settings_path = options.path() / Project::file_name();
   CLOUD_PRINTER_TRACE("import " | project_settings_path.string_view());
   Project project_settings = Project().import_file(File(project_settings_path));
@@ -303,24 +330,34 @@ Build &Build::set_image(const var::StringView name, const var::Data &image) {
 Build &Build::insert_secret_key(
   const var::StringView build_name,
   const var::View secret_key) {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   ImageInfo image_info = build_image_info(normalize_name(build_name));
 
   const u32 location = image_info.get_secret_key_position();
   const u32 size = image_info.get_secret_key_size();
+  CLOUD_PRINTER_TRACE("secret key location is " | NumberString(location, "0x%08x"));
+  CLOUD_PRINTER_TRACE("secret key size is " | NumberString(size));
+  if (size == 0) {
+    return *this;
+  }
 
-  Data generate_secret_key(size);
-  Random().seed().randomize(View(generate_secret_key));
+  Aes::Key new_key;
 
   View secret_key_view
-    = secret_key.size() ? secret_key : View(generate_secret_key);
+    = secret_key.size() ? secret_key : View(new_key.key256());
+
+  CLOUD_PRINTER_TRACE("provided key size is " | NumberString(secret_key.size()));
+  CLOUD_PRINTER_TRACE("generated key size is " | NumberString(new_key.key256().count()));
 
   Data image_data = image_info.get_image_data();
   ViewFile(image_data).seek(location).write(secret_key_view);
 
+  const auto key_string = secret_key_view.to_string();
+  CLOUD_PRINTER_TRACE("final key is " | key_string);
+
   image_info
-    .set_secret_key(
-      StringView(secret_key_view.to_const_char(), secret_key_view.size()))
+    .set_secret_key(key_string)
     .set_image_data(image_data);
 
   return *this;
