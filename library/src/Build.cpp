@@ -30,6 +30,9 @@ Build::Build(const Construct &options)
                       .set_path(options.project_path())
                       .set_build(options.build_name()));
     CLOUD_PRINTER_TRACE("done importing " | options.project_path());
+    if (is_error()) {
+      CLOUD_PRINTER_TRACE("failed to import the build");
+    }
     return;
   }
 
@@ -106,25 +109,29 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   auto program_header_list
     = elf.get_program_header_list(swd::Elf::ProgramHeaderType::load);
 
-  auto symbol_list = elf.get_symbol_list();
+  {
+    api::ErrorGuard error_guard;
+    const auto symbol_list = elf.get_symbol_list();
+    swd::Elf::Symbol mcu_board_config_symbol
+      = symbol_list.find(swd::Elf::Symbol("mcu_board_config"));
 
-  swd::Elf::Symbol mcu_board_config_symbol
-    = symbol_list.find(swd::Elf::Symbol("mcu_board_config"));
+    if (mcu_board_config_symbol.size()) {
+      CLOUD_PRINTER_TRACE("loading mcu board config (deprecated in v4)");
+      elf.load(mcu_board_config_symbol, ViewFile(var::View(mcu_board_config)));
+      key.address = mcu_board_config.secret_key_address;
+      key.size = mcu_board_config.secret_key_size;
+    } else {
+      CLOUD_PRINTER_TRACE("no mcu_board_config find sos_config");
 
-  if (mcu_board_config_symbol.size()) {
-    CLOUD_PRINTER_TRACE("loading mcu board config (deprecated in v4)");
-    elf.load(mcu_board_config_symbol, ViewFile(var::View(mcu_board_config)));
-    key.address = mcu_board_config.secret_key_address;
-    key.size = mcu_board_config.secret_key_size;
-  } else {
-    CLOUD_PRINTER_TRACE("no mcu_board_config find sos_config");
+      swd::Elf::Symbol sos_config_symbol
+        = symbol_list.find(swd::Elf::Symbol("sos_config"));
 
-    swd::Elf::Symbol sos_config_symbol
-      = symbol_list.find(swd::Elf::Symbol("sos_config"));
-
-    if (sos_config_symbol.size()) {
-      CLOUD_PRINTER_TRACE("found sos_config " | NumberString(sos_config_symbol.size()) | ", loading key data ");
-      elf.load(sos_config_symbol, ViewFile(View(key)));
+      if (sos_config_symbol.size()) {
+        CLOUD_PRINTER_TRACE(
+          "found sos_config " | NumberString(sos_config_symbol.size())
+          | ", loading key data ");
+        elf.load(sos_config_symbol, ViewFile(View(key)));
+      }
     }
   }
 
@@ -140,7 +147,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     const auto name = elf.get_section_name(program_header);
 
     if (name == ".text" || name == ".data") {
-      if( name == ".text" ){
+      if (name == ".text") {
         text_start_location = program_header.physical_address();
       }
       CLOUD_PRINTER_TRACE("adding section text/data to build");
@@ -159,11 +166,18 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   }
 
   CLOUD_PRINTER_TRACE(
-    "loaded " | NumberString(section_list.count()) | " additional sections");
+    "loaded " | NumberString(section_list.count())
+    | " additional sections error? " | (is_error() ? "true" : "false"));
+
+  CLOUD_PRINTER_TRACE("data image size is " | NumberString(data_image.size()));
+
+  const u32 key_address
+    = key.address != 0 ? (key.address - text_start_location) & ~0x01 : 0;
+
   return Build::ImageInfo()
     .set_image_data(data_image.data())
     .set_size(data_image.size())
-    .set_secret_key_position((key.address - text_start_location) & ~0x01)
+    .set_secret_key_position(key_address)
     .set_secret_key_size(key.size)
     .set_section_list(section_list);
 }
@@ -173,7 +187,6 @@ Build &Build::import_compiled(const ImportCompiled &options) {
   const auto project_settings_path = options.path() / Project::file_name();
   CLOUD_PRINTER_TRACE("import " | project_settings_path.string_view());
   Project project_settings = Project().import_file(File(project_settings_path));
-
   API_RETURN_VALUE_IF_ERROR(*this);
 
   CLOUD_PRINTER_TRACE("checking for path and project name match");
@@ -267,6 +280,17 @@ Build &Build::import_compiled(const ImportCompiled &options) {
       if (is_application()) {
         // make sure settings are populated in the binary
 
+        if (data_image.size() == 0) {
+          API_RETURN_VALUE_ASSIGN_ERROR(
+            *this,
+            "Failed to load any program data. There might be a problem with "
+            "the firmware image.",
+            EINVAL);
+        }
+
+        CLOUD_PRINTER_TRACE(
+          "setting application details: error? "
+          | StringView((is_error() ? "true" : "false")));
         const sys::Version version(project_settings.get_version());
         Appfs::FileAttributes(
           data_image.seek(0).set_flags(OpenMode::read_write()))
@@ -336,7 +360,8 @@ Build &Build::insert_secret_key(
 
   const u32 location = image_info.get_secret_key_position();
   const u32 size = image_info.get_secret_key_size();
-  CLOUD_PRINTER_TRACE("secret key location is " | NumberString(location, "0x%08x"));
+  CLOUD_PRINTER_TRACE(
+    "secret key location is " | NumberString(location, "0x%08x"));
   CLOUD_PRINTER_TRACE("secret key size is " | NumberString(size));
   if (size == 0) {
     return *this;
@@ -347,8 +372,10 @@ Build &Build::insert_secret_key(
   View secret_key_view
     = secret_key.size() ? secret_key : View(new_key.key256());
 
-  CLOUD_PRINTER_TRACE("provided key size is " | NumberString(secret_key.size()));
-  CLOUD_PRINTER_TRACE("generated key size is " | NumberString(new_key.key256().count()));
+  CLOUD_PRINTER_TRACE(
+    "provided key size is " | NumberString(secret_key.size()));
+  CLOUD_PRINTER_TRACE(
+    "generated key size is " | NumberString(new_key.key256().count()));
 
   Data image_data = image_info.get_image_data();
   ViewFile(image_data).seek(location).write(secret_key_view);
@@ -356,9 +383,7 @@ Build &Build::insert_secret_key(
   const auto key_string = secret_key_view.to_string();
   CLOUD_PRINTER_TRACE("final key is " | key_string);
 
-  image_info
-    .set_secret_key(key_string)
-    .set_image_data(image_data);
+  image_info.set_secret_key(key_string).set_image_data(image_data);
 
   return *this;
 }

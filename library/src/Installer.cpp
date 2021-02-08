@@ -1,12 +1,12 @@
 // Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
 #include <chrono.hpp>
+#include <crypto.hpp>
 #include <fs.hpp>
 #include <json.hpp>
 #include <printer.hpp>
 #include <sos.hpp>
 #include <var.hpp>
-#include <crypto.hpp>
 
 #include "service/Installer.hpp"
 #include "service/Thing.hpp"
@@ -124,6 +124,7 @@ void Installer::install_binary(const Install &options) {
 }
 
 void Installer::install_path(const Install &options) {
+  API_RETURN_IF_ERROR();
   CLOUD_PRINTER_TRACE("installing from path " & options.project_path());
 
   Build b(Build::Construct()
@@ -131,20 +132,27 @@ void Installer::install_path(const Install &options) {
             .set_build_name(options.build_name())
             .set_architecture(architecture()));
 
+  if( is_error() ){
+    CLOUD_PRINTER_TRACE("error constructing build. aborting");
+    return;
+  }
+
   CLOUD_PRINTER_TRACE("setting installer project id to " | b.get_project_id());
   set_project_id(b.get_project_id());
   set_project_name(fs::Path::name(options.project_path()));
   CLOUD_PRINTER_TRACE("setting installer project name to " | project_name());
 
+
+
   if (
     b.decode_build_type() == Build::Type::application
     && !options.is_application()) {
-      CLOUD_PRINTER_TRACE("project type != application");
+    CLOUD_PRINTER_TRACE("project type != application");
     API_RETURN_ASSIGN_ERROR("app type mismatch", false);
   }
 
   if (b.decode_build_type() == Build::Type::os && !options.is_os()) {
-      CLOUD_PRINTER_TRACE("project type != os");
+    CLOUD_PRINTER_TRACE("project type != os");
     API_RETURN_ASSIGN_ERROR("os type mismatch", false);
   }
 
@@ -262,8 +270,8 @@ void Installer::update_os(const Install &options) {
 }
 
 void Installer::install_build(Build &build, const Install &options) {
-    API_RETURN_IF_ERROR();
-    CLOUD_PRINTER_TRACE("Installing build type " | build.get_type());
+  API_RETURN_IF_ERROR();
+  CLOUD_PRINTER_TRACE("Installing build type " | build.get_type());
   if (build.decode_build_type() == Build::Type::application) {
     CLOUD_PRINTER_TRACE("installing application build");
     install_application_build(build, options);
@@ -336,7 +344,6 @@ void Installer::install_os_build(Build &build, const Install &options) {
       thing_team = options.team_id();
     }
 
-
     if (existing_secret_key.is_empty() && !options.is_rekey_thing()) {
       CLOUD_PRINTER_TRACE("getting secret key from cloud");
       Thing thing(Sys::Info(connection()->info().sys_info()));
@@ -349,9 +356,9 @@ void Installer::install_os_build(Build &build, const Install &options) {
       CLOUD_PRINTER_TRACE("got secret key `" | options.secret_key() | "`");
     }
 
-
     CLOUD_PRINTER_TRACE("using key `" | existing_secret_key | "`");
-    //if existing_secret_key secret key is empty, insert_secret_key() generates a key
+    // if existing_secret_key secret key is empty, insert_secret_key() generates
+    // a key
     build.insert_secret_key(
       options.build_name(),
       var::Data::from_string(existing_secret_key));
