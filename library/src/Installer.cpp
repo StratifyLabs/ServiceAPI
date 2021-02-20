@@ -132,7 +132,7 @@ void Installer::install_path(const Install &options) {
             .set_build_name(options.build_name())
             .set_architecture(architecture()));
 
-  if( is_error() ){
+  if (is_error()) {
     CLOUD_PRINTER_TRACE("error constructing build. aborting");
     return;
   }
@@ -141,8 +141,6 @@ void Installer::install_path(const Install &options) {
   set_project_id(b.get_project_id());
   set_project_name(fs::Path::name(options.project_path()));
   CLOUD_PRINTER_TRACE("setting installer project name to " | project_name());
-
-
 
   if (
     b.decode_build_type() == Build::Type::application
@@ -607,73 +605,89 @@ void Installer::save_image_locally(
     CLOUD_PRINTER_TRACE("saving image to " + options.destination());
     PathString destination;
     Link::Path link_path(options.destination(), connection()->driver());
+    Link::FileSystem link_filesystem(connection()->driver());
 
     if (link_path.is_host_path()) {
-
-      FileInfo info = FileSystem().exists(link_path.path())
-                        ? FileSystem().get_info(link_path.path())
+      CLOUD_PRINTER_TRACE("dest path is on local host");
+    } else {
+      CLOUD_PRINTER_TRACE("dest path is on target device");
+    }
+    const auto info = link_filesystem.exists(link_path.path())
+                        ? link_filesystem.get_info(link_path.path())
                         : FileInfo();
 
-      if (link_path.path().is_empty() || info.is_directory()) {
-        // if directory do <dir>/<project>_<build_name> with .bin for os images
-        destination
-          = (link_path.path().is_empty() ? "" : (link_path.path() & "/"))
-            & project_name() + "_"
-            & Build(Build::Construct())
-                .set_type(
-                  options.is_os() ? Build::os_type()
-                                  : Build::application_type())
-                .set_application_architecture(architecture())
-                .normalize_name(options.build_name())
-            & (options.is_os() ? ".bin" : "");
+    if (link_path.path().is_empty() || info.is_directory()) {
+      // if directory do <dir>/<project>_<build_name> with .bin for os images
+      destination
+        = (link_path.path().is_empty() ? "" : (link_path.path() & "/"))
+          & project_name() + "_"
+          & Build(Build::Construct())
+              .set_type(
+                options.is_os() ? Build::os_type() : Build::application_type())
+              .set_application_architecture(architecture())
+              .normalize_name(options.build_name())
+          & (options.is_os() ? ".bin" : "");
 
+    } else {
+      destination = link_path.path();
+    }
+
+    auto append_hash = [&](
+                         Data &&image_data,
+                         const StringView name,
+                         bool is_append_hash) -> Data {
+      if (is_append_hash == false) {
+        return image_data;
       } else {
-        destination = link_path.path();
+        DataFile hashed = DataFile()
+                            .reserve(image_data.size())
+                            .write(ViewFile(image_data))
+                            .move();
+
+        crypto::Sha256::Hash hash = crypto::Sha256::append_aligned_hash(hashed);
+        printer().key(name & "Hash", View(hash).to_string());
+
+        return hashed.data();
       }
+    };
 
-      auto append_hash = [&](
-                           Data &&image_data,
-                           const StringView name,
-                           bool is_append_hash) -> Data {
-        if (is_append_hash == false) {
-          return image_data;
-        } else {
-          DataFile hashed = DataFile()
-                              .reserve(image_data.size())
-                              .write(ViewFile(image_data))
-                              .move();
+    Printer::Object sections_object(printer(), "sections");
+    printer().key(".text", link_path.prefix() | destination);
 
-          crypto::Sha256::Hash hash
-            = crypto::Sha256::append_aligned_hash(hashed);
-          printer().key(name & "Hash", View(hash).to_string());
+    CLOUD_PRINTER_TRACE("save binary file at path " & destination);
+    // hash for image was previously added
+    Link::File(
+      File::IsOverwrite::yes,
+      destination,
+      OpenMode::read_write(),
+      Permissions(0777),
+      link_path.driver())
+      .write(
+        image,
+        File::Write().set_progress_callback(printer().progress_callback()));
 
-          return hashed.data();
-        }
-      };
+    JsonKeyValueList<Build::SectionImageInfo> section_image_info
+      = build.build_image_info(options.build_name()).get_section_list();
 
-      Printer::Object sections_object(printer(), "sections");
-      printer().key(".text", "host@" & destination);
+    for (const Build::SectionImageInfo &image_info : section_image_info) {
+      if (image_info.key().is_empty() == false) {
+        const var::PathString section_destination
+          = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
 
-      CLOUD_PRINTER_TRACE("save binary file on host " & destination);
-      // hash for image was previously added
-      File(File::IsOverwrite::yes, destination).write(image);
+        printer().key(
+          image_info.key(),
+          link_path.prefix() | section_destination);
 
-      JsonKeyValueList<Build::SectionImageInfo> section_image_info
-        = build.build_image_info(options.build_name()).get_section_list();
-
-      for (const Build::SectionImageInfo &image_info : section_image_info) {
-        if (image_info.key().is_empty() == false) {
-          const var::PathString section_destination
-            = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
-
-          printer().key(image_info.key(), "host@" + section_destination);
-
-          File(File::IsOverwrite::yes, section_destination)
-            .write(append_hash(
-              image_info.get_image_data(),
-              image_info.key(),
-              options.is_append_hash()));
-        }
+        Link::File(
+          File::IsOverwrite::yes,
+          section_destination,
+          OpenMode::read_write(),
+          Permissions(0777),
+          link_path.driver())
+          .write(append_hash(
+            image_info.get_image_data(),
+            image_info.key(),
+            options.is_append_hash()));
       }
     }
   }
