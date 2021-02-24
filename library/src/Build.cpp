@@ -105,10 +105,6 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   mcu_board_config_t mcu_board_config = {0};
   json::JsonKeyValueList<SectionImageInfo> section_list;
 
-  // Data image is the loadable sections of the ELF file
-  auto program_header_list
-    = elf.get_program_header_list(swd::Elf::ProgramHeaderType::load);
-
   {
     api::ErrorGuard error_guard;
     const auto symbol_list = elf.get_symbol_list();
@@ -137,6 +133,12 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
 
   CLOUD_PRINTER_TRACE("key size is " | NumberString(key.size));
 
+  // Data image is the loadable sections of the ELF file
+  auto program_header_list
+    = elf.get_program_header_list(swd::Elf::ProgramHeaderType::load);
+
+  CLOUD_PRINTER_TRACE("ELF has " | NumberString(program_header_list.count()) | " loadable program headers");
+
   u32 text_start_location = 0;
   for (const swd::Elf::ProgramHeader &program_header : program_header_list) {
 
@@ -147,10 +149,13 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     const auto name = elf.get_section_name(program_header);
 
     if (name == ".text" || name == ".data") {
-      if (name == ".text") {
-        text_start_location = program_header.physical_address();
-      }
       CLOUD_PRINTER_TRACE("adding section text/data to build");
+      if (name == ".text") {
+        CLOUD_PRINTER_TRACE("adding text bytes " | NumberString(program_header.memory_size()));
+        text_start_location = program_header.physical_address();
+      } else {
+        CLOUD_PRINTER_TRACE("adding data bytes " | NumberString(program_header.memory_size()));
+      }
       data_image.write(
         elf.file().seek(program_header.offset()),
         File::Write().set_size(program_header.file_size()));

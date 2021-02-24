@@ -91,6 +91,8 @@ void Installer::install_id(const Install &options) {
 }
 
 void Installer::install_binary(const Install &options) {
+  CLOUD_PRINTER_TRACE("install binary at " | options.binary_path());
+  API_RETURN_IF_ERROR();
 
   if (fs::Path::suffix(options.binary_path()) == "json") {
     Build b = Build(Build::Construct().set_binary_path(options.binary_path()));
@@ -98,13 +100,21 @@ void Installer::install_binary(const Install &options) {
     return install_build(b, options);
   }
 
+  //check if the binary is an elf file
+  if( FileSystem().exists(options.binary_path()) == false ){
+    API_RETURN_ASSIGN_ERROR(options.binary_path() | " binary path not found", EINVAL);
+  }
+
+  CLOUD_PRINTER_TRACE("load image from binary path");
   DataFile image = DataFile()
                      .write(File(options.binary_path()))
                      .set_flags(OpenMode::read_write())
                      .seek(0)
                      .move();
 
+
   if (options.is_application()) {
+    CLOUD_PRINTER_TRACE("binary is an application");
     Appfs::Info source_image_info = Appfs().get_info(options.binary_path());
 
     if (source_image_info.is_valid() == false) {
@@ -119,6 +129,7 @@ void Installer::install_binary(const Install &options) {
   }
 
   if (options.is_os()) {
+    CLOUD_PRINTER_TRACE("install OS image from binary");
     return install_os_image(Build(Build::Construct()), image, options);
   }
 }
@@ -526,21 +537,26 @@ void Installer::install_os_image(
   const Build &build,
   const FileObject &image,
   const Install &options) {
+  API_RETURN_IF_ERROR();
 
   if (!options.destination().is_empty()) {
+    CLOUD_PRINTER_TRACE("save build image locally");
     save_image_locally(build, image, Install(options).set_os());
     return;
   }
+
   {
     Printer::Object po(printer(), "bootloader");
     if (!connection()->is_bootloader()) {
-
+      CLOUD_PRINTER_TRACE("invoke the bootloader");
       // bootloader must be invoked
       connection()->reset_bootloader();
       chrono::wait(options.delay());
       // now reconnect to the device
 
       reconnect(options);
+    } else {
+      CLOUD_PRINTER_TRACE("connected to bootloader");
     }
 
     API_RETURN_IF_ERROR();
@@ -548,6 +564,7 @@ void Installer::install_os_image(
     ClockTimer transfer_timer;
     printer().set_progress_key("installing");
     transfer_timer.start();
+    CLOUD_PRINTER_TRACE("start installing the OS");
     connection()->update_os(
       Link::UpdateOs()
         .set_image(&(image.seek(0)))
@@ -558,9 +575,7 @@ void Installer::install_os_image(
     transfer_timer.stop();
     printer().set_progress_key("progress");
 
-    if (is_error()) {
-      return;
-    }
+    API_RETURN_IF_ERROR();
 
     print_transfer_info(image, transfer_timer);
 
@@ -605,7 +620,7 @@ void Installer::save_image_locally(
     CLOUD_PRINTER_TRACE("saving image to " + options.destination());
     PathString destination;
     Link::Path link_path(options.destination(), connection()->driver());
-    Link::FileSystem link_filesystem(connection()->driver());
+    Link::FileSystem link_filesystem(link_path.driver());
 
     if (link_path.is_host_path()) {
       CLOUD_PRINTER_TRACE("dest path is on local host");
@@ -615,6 +630,8 @@ void Installer::save_image_locally(
     const auto info = link_filesystem.exists(link_path.path())
                         ? link_filesystem.get_info(link_path.path())
                         : FileInfo();
+
+    CLOUD_PRINTER_TRACE(link_path.path() | GeneralString(" is dest a directory ") | (info.is_directory() ? "true" : "false"));
 
     if (link_path.path().is_empty() || info.is_directory()) {
       // if directory do <dir>/<project>_<build_name> with .bin for os images
@@ -627,6 +644,9 @@ void Installer::save_image_locally(
               .set_application_architecture(architecture())
               .normalize_name(options.build_name())
           & (options.is_os() ? ".bin" : "");
+
+      CLOUD_PRINTER_TRACE("destination path constructed as " | destination);
+
 
     } else {
       destination = link_path.path();
