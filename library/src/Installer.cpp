@@ -724,17 +724,16 @@ void Installer::kill_application(int app_pid) {
 
   // give a little time for the program to shut down
   int retries = 0;
-  while (((app_pid = task_manager.get_pid(project_name())) > 0)
-         && (retries < 5)) {
+  while ((task_manager.get_pid(project_name()) > 0) && (retries < 5)) {
     retries++;
     chrono::wait(100_milliseconds);
   }
 }
 
-void Installer::clean_application() {
+Installer &Installer::clean_application(const var::StringView name) {
   Link::FileSystem fs(connection()->driver());
-  const auto unlink_flash_app = var::PathString("/app/flash") / project_name();
-  const auto unlink_ram_app = var::PathString("/app/ram") / project_name();
+  const auto unlink_flash_app = var::PathString("/app/flash") / name;
+  const auto unlink_ram_app = var::PathString("/app/ram") / name;
 
   struct ThreadArgument {
     Printer *printer;
@@ -745,8 +744,7 @@ void Installer::clean_application() {
   ThreadArgument thread_argument;
   thread_argument.printer = &printer();
 
-  Thread progress_thread
-    = Thread(
+  Thread progress_thread(
         Thread::Attributes().set_detach_state(Thread::DetachState::joinable),
         Thread::Construct()
           .set_argument(&thread_argument)
@@ -770,22 +768,14 @@ void Installer::clean_application() {
             printer->set_progress_key("progress");
             printer->update_progress(0, 0);
             return nullptr;
-          }))
-        .move();
+          }));
 
-  {
-    while (is_success() && fs.exists(unlink_flash_app)) {
-      fs.remove(unlink_flash_app);
-      // delete all versions
-    }
-    API_RESET_ERROR();
+  while (fs.exists(unlink_flash_app)) {
+    fs.remove(unlink_flash_app);
   }
 
-  {
-    while (is_success() && fs.exists(unlink_ram_app)) {
-      fs.remove(unlink_ram_app);
-    }
-    API_RESET_ERROR();
+  while (fs.exists(unlink_ram_app)) {
+    fs.remove(unlink_ram_app);
   }
 
   {
@@ -793,6 +783,11 @@ void Installer::clean_application() {
     thread_argument.is_clean_complete = true;
   }
   progress_thread.join();
+  return *this;
+}
+
+void Installer::clean_application() {
+  clean_application(project_name());
 }
 
 void Installer::print_transfer_info(

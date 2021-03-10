@@ -95,6 +95,8 @@ public:
     const fs::FileObject &image,
     const chrono::ClockTimer &transfer_timer);
 
+  Installer & clean_application(const var::StringView name);
+
 private:
   API_ACCESS_FUNDAMENTAL(Installer, sos::Link *, connection, nullptr);
   API_ACCESS_COMPOUND(Installer, var::StringView, project_name);
