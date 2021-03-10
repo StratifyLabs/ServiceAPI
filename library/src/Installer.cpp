@@ -6,6 +6,7 @@
 #include <json.hpp>
 #include <printer.hpp>
 #include <sos.hpp>
+#include <thread.hpp>
 #include <var.hpp>
 
 #include "service/Installer.hpp"
@@ -100,9 +101,11 @@ void Installer::install_binary(const Install &options) {
     return install_build(b, options);
   }
 
-  //check if the binary is an elf file
-  if( FileSystem().exists(options.binary_path()) == false ){
-    API_RETURN_ASSIGN_ERROR(options.binary_path() | " binary path not found", EINVAL);
+  // check if the binary is an elf file
+  if (FileSystem().exists(options.binary_path()) == false) {
+    API_RETURN_ASSIGN_ERROR(
+      options.binary_path() | " binary path not found",
+      EINVAL);
   }
 
   CLOUD_PRINTER_TRACE("load image from binary path");
@@ -111,7 +114,6 @@ void Installer::install_binary(const Install &options) {
                      .set_flags(OpenMode::read_write())
                      .seek(0)
                      .move();
-
 
   if (options.is_application()) {
     CLOUD_PRINTER_TRACE("binary is an application");
@@ -631,7 +633,9 @@ void Installer::save_image_locally(
                         ? link_filesystem.get_info(link_path.path())
                         : FileInfo();
 
-    CLOUD_PRINTER_TRACE(link_path.path() | GeneralString(" is dest a directory ") | (info.is_directory() ? "true" : "false"));
+    CLOUD_PRINTER_TRACE(
+      link_path.path() | GeneralString(" is dest a directory ")
+      | (info.is_directory() ? "true" : "false"));
 
     if (link_path.path().is_empty() || info.is_directory()) {
       // if directory do <dir>/<project>_<build_name> with .bin for os images
@@ -646,7 +650,6 @@ void Installer::save_image_locally(
           & (options.is_os() ? ".bin" : "");
 
       CLOUD_PRINTER_TRACE("destination path constructed as " | destination);
-
 
     } else {
       destination = link_path.path();
@@ -729,28 +732,67 @@ void Installer::kill_application(int app_pid) {
 }
 
 void Installer::clean_application() {
-  {
-    printer().key("clean", project_name());
-    const var::PathString unlink_path
-      = var::PathString("/app/flash") / project_name();
+  Link::FileSystem fs(connection()->driver());
+  const auto unlink_flash_app = var::PathString("/app/flash") / project_name();
+  const auto unlink_ram_app = var::PathString("/app/ram") / project_name();
 
-    while (is_success()) {
-      Link::FileSystem(connection()->driver())
-        .remove(unlink_path.string_view());
+  struct ThreadArgument {
+    Printer *printer;
+    Mutex mutex;
+    bool is_clean_complete;
+  };
+
+  ThreadArgument thread_argument;
+  thread_argument.printer = &printer();
+
+  Thread progress_thread
+    = Thread(
+        Thread::Attributes().set_detach_state(Thread::DetachState::joinable),
+        Thread::Construct()
+          .set_argument(&thread_argument)
+          .set_function([](void *args) -> void * {
+            ThreadArgument *thread_argument
+              = reinterpret_cast<ThreadArgument *>(args);
+            Printer *printer = thread_argument->printer;
+            printer->set_progress_key("clean");
+            bool is_complete = false;
+            int count = 0;
+            do {
+              printer->update_progress(
+                count++,
+                api::ProgressCallback::indeterminate_progress_total());
+              {
+                Mutex::Guard mg(thread_argument->mutex);
+                is_complete = thread_argument->is_clean_complete;
+              }
+              wait(250_milliseconds);
+            } while (is_complete == false);
+            printer->set_progress_key("progress");
+            printer->update_progress(0, 0);
+            return nullptr;
+          }))
+        .move();
+
+  {
+    while (is_success() && fs.exists(unlink_flash_app)) {
+      fs.remove(unlink_flash_app);
       // delete all versions
     }
     API_RESET_ERROR();
   }
 
   {
-    const var::PathString unlink_path
-      = var::PathString("/app/ram") / project_name();
-    while (is_success()) {
-      Link::FileSystem(connection()->driver())
-        .remove(unlink_path.string_view());
+    while (is_success() && fs.exists(unlink_ram_app)) {
+      fs.remove(unlink_ram_app);
     }
     API_RESET_ERROR();
   }
+
+  {
+    Mutex::Guard mg(thread_argument.mutex);
+    thread_argument.is_clean_complete = true;
+  }
+  progress_thread.join();
 }
 
 void Installer::print_transfer_info(
