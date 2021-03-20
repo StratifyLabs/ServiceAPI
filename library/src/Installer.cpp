@@ -618,100 +618,103 @@ void Installer::save_image_locally(
   const fs::FileObject &image,
   const Install &options) {
 
-  if (!options.destination().is_empty()) {
-    CLOUD_PRINTER_TRACE("saving image to " + options.destination());
-    PathString destination;
-    Link::Path link_path(options.destination(), connection()->driver());
-    Link::FileSystem link_filesystem(link_path.driver());
+  API_ASSERT(options.destination().is_empty() == false);
 
-    if (link_path.is_host_path()) {
-      CLOUD_PRINTER_TRACE("dest path is on local host");
-    } else {
-      CLOUD_PRINTER_TRACE("dest path is on target device");
+  CLOUD_PRINTER_TRACE("saving image to " + options.destination());
+  PathString destination;
+  Link::Path link_path(options.destination(), connection()->driver());
+  Link::FileSystem link_filesystem(link_path.driver());
+
+  if (link_path.is_host_path()) {
+    CLOUD_PRINTER_TRACE("dest path is on local host");
+  } else {
+    CLOUD_PRINTER_TRACE("dest path is on target device");
+  }
+  const auto info = link_filesystem.exists(link_path.path())
+                      ? link_filesystem.get_info(link_path.path())
+                      : FileInfo();
+
+  CLOUD_PRINTER_TRACE(
+    link_path.path() | GeneralString(" is dest a directory ")
+    | (info.is_directory() ? "true" : "false"));
+
+  if (link_path.path().is_empty() || info.is_directory()) {
+    // if directory do <dir>/<project>_<build_name> with .bin for os images
+    destination
+      = (link_path.path().is_empty() ? "" : (link_path.path() & "/"))
+        & project_name() + "_"
+        & Build(Build::Construct())
+            .set_type(
+              options.is_os() ? Build::os_type() : Build::application_type())
+            .set_application_architecture(architecture())
+            .normalize_name(options.build_name())
+        & (options.is_os() ? ".bin" : "");
+
+    CLOUD_PRINTER_TRACE("destination path constructed as " | destination);
+
+  } else {
+    destination = link_path.path();
+
+    //parent should be an existing directory
+    const auto parent_path = Path::parent_directory(destination);
+    if( link_filesystem.directory_exists(parent_path) == false ){
+      API_RETURN_ASSIGN_ERROR(PathString(parent_path).cstring(), ENOENT);
     }
-    const auto info = link_filesystem.exists(link_path.path())
-                        ? link_filesystem.get_info(link_path.path())
-                        : FileInfo();
 
-    CLOUD_PRINTER_TRACE(
-      link_path.path() | GeneralString(" is dest a directory ")
-      | (info.is_directory() ? "true" : "false"));
+  }
 
-    if (link_path.path().is_empty() || info.is_directory()) {
-      // if directory do <dir>/<project>_<build_name> with .bin for os images
-      destination
-        = (link_path.path().is_empty() ? "" : (link_path.path() & "/"))
-          & project_name() + "_"
-          & Build(Build::Construct())
-              .set_type(
-                options.is_os() ? Build::os_type() : Build::application_type())
-              .set_application_architecture(architecture())
-              .normalize_name(options.build_name())
-          & (options.is_os() ? ".bin" : "");
-
-      CLOUD_PRINTER_TRACE("destination path constructed as " | destination);
-
+  auto append_hash =
+    [&](Data &&image_data, const StringView name, bool is_append_hash) -> Data {
+    if (is_append_hash == false) {
+      return image_data;
     } else {
-      destination = link_path.path();
+      DataFile hashed = DataFile()
+                          .reserve(image_data.size())
+                          .write(ViewFile(image_data))
+                          .move();
+
+      crypto::Sha256::Hash hash = crypto::Sha256::append_aligned_hash(hashed);
+      printer().key(name & "Hash", View(hash).to_string());
+
+      return hashed.data();
     }
+  };
 
-    auto append_hash = [&](
-                         Data &&image_data,
-                         const StringView name,
-                         bool is_append_hash) -> Data {
-      if (is_append_hash == false) {
-        return image_data;
-      } else {
-        DataFile hashed = DataFile()
-                            .reserve(image_data.size())
-                            .write(ViewFile(image_data))
-                            .move();
+  Printer::Object sections_object(printer(), "sections");
+  printer().key(".text", link_path.prefix() | destination);
 
-        crypto::Sha256::Hash hash = crypto::Sha256::append_aligned_hash(hashed);
-        printer().key(name & "Hash", View(hash).to_string());
+  CLOUD_PRINTER_TRACE("save binary file at path " & destination);
+  // hash for image was previously added
+  Link::File(
+    File::IsOverwrite::yes,
+    destination,
+    OpenMode::read_write(),
+    Permissions(0777),
+    link_path.driver())
+    .write(
+      image,
+      File::Write().set_progress_callback(printer().progress_callback()));
 
-        return hashed.data();
-      }
-    };
+  JsonKeyValueList<Build::SectionImageInfo> section_image_info
+    = build.build_image_info(options.build_name()).get_section_list();
 
-    Printer::Object sections_object(printer(), "sections");
-    printer().key(".text", link_path.prefix() | destination);
+  for (const Build::SectionImageInfo &image_info : section_image_info) {
+    if (image_info.key().is_empty() == false) {
+      const var::PathString section_destination
+        = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
 
-    CLOUD_PRINTER_TRACE("save binary file at path " & destination);
-    // hash for image was previously added
-    Link::File(
-      File::IsOverwrite::yes,
-      destination,
-      OpenMode::read_write(),
-      Permissions(0777),
-      link_path.driver())
-      .write(
-        image,
-        File::Write().set_progress_callback(printer().progress_callback()));
+      printer().key(image_info.key(), link_path.prefix() | section_destination);
 
-    JsonKeyValueList<Build::SectionImageInfo> section_image_info
-      = build.build_image_info(options.build_name()).get_section_list();
-
-    for (const Build::SectionImageInfo &image_info : section_image_info) {
-      if (image_info.key().is_empty() == false) {
-        const var::PathString section_destination
-          = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
-
-        printer().key(
+      Link::File(
+        File::IsOverwrite::yes,
+        section_destination,
+        OpenMode::read_write(),
+        Permissions(0777),
+        link_path.driver())
+        .write(append_hash(
+          image_info.get_image_data(),
           image_info.key(),
-          link_path.prefix() | section_destination);
-
-        Link::File(
-          File::IsOverwrite::yes,
-          section_destination,
-          OpenMode::read_write(),
-          Permissions(0777),
-          link_path.driver())
-          .write(append_hash(
-            image_info.get_image_data(),
-            image_info.key(),
-            options.is_append_hash()));
-      }
+          options.is_append_hash()));
     }
   }
 }
@@ -745,30 +748,30 @@ Installer &Installer::clean_application(const var::StringView name) {
   thread_argument.printer = &printer();
 
   Thread progress_thread(
-        Thread::Attributes().set_detach_state(Thread::DetachState::joinable),
-        Thread::Construct()
-          .set_argument(&thread_argument)
-          .set_function([](void *args) -> void * {
-            ThreadArgument *thread_argument
-              = reinterpret_cast<ThreadArgument *>(args);
-            Printer *printer = thread_argument->printer;
-            printer->set_progress_key("clean");
-            bool is_complete = false;
-            int count = 0;
-            do {
-              printer->update_progress(
-                count++,
-                api::ProgressCallback::indeterminate_progress_total());
-              {
-                Mutex::Guard mg(thread_argument->mutex);
-                is_complete = thread_argument->is_clean_complete;
-              }
-              wait(250_milliseconds);
-            } while (is_complete == false);
-            printer->set_progress_key("progress");
-            printer->update_progress(0, 0);
-            return nullptr;
-          }));
+    Thread::Attributes().set_detach_state(Thread::DetachState::joinable),
+    Thread::Construct()
+      .set_argument(&thread_argument)
+      .set_function([](void *args) -> void * {
+        ThreadArgument *thread_argument
+          = reinterpret_cast<ThreadArgument *>(args);
+        Printer *printer = thread_argument->printer;
+        printer->set_progress_key("clean");
+        bool is_complete = false;
+        int count = 0;
+        do {
+          printer->update_progress(
+            count++,
+            api::ProgressCallback::indeterminate_progress_total());
+          {
+            Mutex::Guard mg(thread_argument->mutex);
+            is_complete = thread_argument->is_clean_complete;
+          }
+          wait(250_milliseconds);
+        } while (is_complete == false);
+        printer->set_progress_key("progress");
+        printer->update_progress(0, 0);
+        return nullptr;
+      }));
 
   while (fs.exists(unlink_flash_app)) {
     fs.remove(unlink_flash_app);
@@ -786,9 +789,7 @@ Installer &Installer::clean_application(const var::StringView name) {
   return *this;
 }
 
-void Installer::clean_application() {
-  clean_application(project_name());
-}
+void Installer::clean_application() { clean_application(project_name()); }
 
 void Installer::print_transfer_info(
   const fs::FileObject &image,
