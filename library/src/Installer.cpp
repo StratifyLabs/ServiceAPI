@@ -184,12 +184,13 @@ Installer::get_app_update_list(const Install &options) {
 var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
   const var::StringView directory_path,
   const Install &options) {
+  MCU_UNUSED_ARGUMENT(options);
   var::Vector<AppUpdate> result;
 
   fs::PathList directory_list
     = Link::FileSystem(connection()->driver()).read_directory(directory_path);
 
-  for (const auto item : directory_list) {
+  for (const auto & item : directory_list) {
     var::PathString full_path = var::PathString(directory_path) / item;
     Appfs::Info info = Appfs(connection()->driver()).get_info(full_path);
 
@@ -655,14 +656,14 @@ void Installer::save_image_locally(
 
   // parent should be an existing directory
   const auto parent_path = Path::parent_directory(destination);
-  if (link_filesystem.directory_exists(parent_path) == false) {
+  if (parent_path.is_empty() == false && link_filesystem.directory_exists(parent_path) == false) {
     API_RETURN_ASSIGN_ERROR(PathString(parent_path).cstring(), ENOENT);
   }
 
   const auto append_hash =
     [&](Data &&image_data, const StringView name, bool is_append_hash) -> Data {
     if (is_append_hash == false) {
-      return image_data;
+      return std::move(image_data);
     } else {
       DataFile hashed = DataFile()
                           .reserve(image_data.size())
