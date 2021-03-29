@@ -621,7 +621,6 @@ void Installer::save_image_locally(
   API_ASSERT(options.destination().is_empty() == false);
 
   CLOUD_PRINTER_TRACE("saving image to " + options.destination());
-  PathString destination;
   Link::Path link_path(options.destination(), connection()->driver());
   Link::FileSystem link_filesystem(link_path.driver());
 
@@ -638,32 +637,29 @@ void Installer::save_image_locally(
     link_path.path() | GeneralString(" is dest a directory ")
     | (info.is_directory() ? "true" : "false"));
 
-  if (link_path.path().is_empty() || info.is_directory()) {
-    // if directory do <dir>/<project>_<build_name> with .bin for os images
-    destination
-      = (link_path.path().is_empty() ? "" : (link_path.path() & "/"))
-        & project_name() + "_"
-        & Build(Build::Construct())
-            .set_type(
-              options.is_os() ? Build::os_type() : Build::application_type())
-            .set_application_architecture(architecture())
-            .normalize_name(options.build_name())
-        & (options.is_os() ? ".bin" : "");
+  const auto is_directory = link_path.path().is_empty() || info.is_directory();
 
-    CLOUD_PRINTER_TRACE("destination path constructed as " | destination);
+  const PathString destination
+    = is_directory
+        ?
+        // if directory do <dir>/<project>_<build_name> with .bin for os images
+        (link_path.path().is_empty() ? "" : (link_path.path() & "/"))
+          & project_name() + "_"
+          & Build(Build::Construct())
+              .set_type(
+                options.is_os() ? Build::os_type() : Build::application_type())
+              .set_application_architecture(architecture())
+              .normalize_name(options.build_name())
+          & (options.is_os() ? ".bin" : "")
+        : PathString(link_path.path());
 
-  } else {
-    destination = link_path.path();
-
-    //parent should be an existing directory
-    const auto parent_path = Path::parent_directory(destination);
-    if( link_filesystem.directory_exists(parent_path) == false ){
-      API_RETURN_ASSIGN_ERROR(PathString(parent_path).cstring(), ENOENT);
-    }
-
+  // parent should be an existing directory
+  const auto parent_path = Path::parent_directory(destination);
+  if (link_filesystem.directory_exists(parent_path) == false) {
+    API_RETURN_ASSIGN_ERROR(PathString(parent_path).cstring(), ENOENT);
   }
 
-  auto append_hash =
+  const auto append_hash =
     [&](Data &&image_data, const StringView name, bool is_append_hash) -> Data {
     if (is_append_hash == false) {
       return image_data;
