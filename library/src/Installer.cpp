@@ -190,7 +190,7 @@ var::Vector<Installer::AppUpdate> Installer::get_app_update_list_from_directory(
   fs::PathList directory_list
     = Link::FileSystem(connection()->driver()).read_directory(directory_path);
 
-  for (const auto & item : directory_list) {
+  for (const auto &item : directory_list) {
     var::PathString full_path = var::PathString(directory_path) / item;
     Appfs::Info info = Appfs(connection()->driver()).get_info(full_path);
 
@@ -490,9 +490,11 @@ void Installer::install_application_image(
     clean_application();
   }
 
-  sys::Version version(options.version());
-
   Appfs::FileAttributes attributes(image.seek(0));
+
+  const auto version = options.version().is_empty()
+                         ? sys::Version::from_u16(attributes.version())
+                         : sys::Version(options.version());
 
   attributes.set_name(project_name() + options.suffix())
     .set_id(project_id())
@@ -656,7 +658,9 @@ void Installer::save_image_locally(
 
   // parent should be an existing directory
   const auto parent_path = Path::parent_directory(destination);
-  if (parent_path.is_empty() == false && link_filesystem.directory_exists(parent_path) == false) {
+  if (
+    parent_path.is_empty() == false
+    && link_filesystem.directory_exists(parent_path) == false) {
     API_RETURN_ASSIGN_ERROR(PathString(parent_path).cstring(), ENOENT);
   }
 
