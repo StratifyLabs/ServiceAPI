@@ -320,7 +320,7 @@ void Installer::install_application_build(
 
   if (options.is_append_hash()) {
     const auto hash = crypto::Sha256::append_aligned_hash(image);
-    printer().key("hash", View(hash).to_string());
+    printer().key("hash", View(hash).to_string<KeyString>());
   }
 
   CLOUD_PRINTER_TRACE("installing application image");
@@ -408,7 +408,7 @@ void Installer::install_os_build(Build &build, const Install &options) {
   if (options.is_append_hash()) {
     const crypto::Sha256::Hash hash
       = crypto::Sha256::append_aligned_hash(image);
-    printer().key("osHash", View(hash).to_string());
+    printer().key("osHash", View(hash).to_string<KeyString>());
   }
 
   printer().key(
@@ -675,7 +675,7 @@ void Installer::save_image_locally(
                           .move();
 
       crypto::Sha256::Hash hash = crypto::Sha256::append_aligned_hash(hashed);
-      printer().key(name & "Hash", View(hash).to_string());
+      printer().key(name & "Hash", View(hash).to_string<KeyString>());
 
       return hashed.data();
     }

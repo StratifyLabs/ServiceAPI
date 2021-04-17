@@ -152,7 +152,7 @@ public:
         printer().key("encryptBlob", input.get_blob());
         printer().key(
           "encryptHex",
-          Base64().decode(input.get_blob()).to_string());
+          Base64().decode(input.get_blob()).view().to_string<var::String>());
 
         JsonObject result = input.decrypt_value(key);
         printer().object("result", result);
@@ -331,7 +331,7 @@ public:
 
     Array<u8, 32> buffer;
     Random().seed().randomize(buffer);
-    const String hardware_id = View(buffer).to_string();
+    const auto hardware_id = View(buffer).to_string<var::GeneralString>();
     {
       Hardware hardware;
       hardware.set_permissions(Hardware::Permissions::public_)

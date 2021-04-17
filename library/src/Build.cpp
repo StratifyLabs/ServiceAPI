@@ -385,7 +385,7 @@ Build &Build::insert_secret_key(
   Data image_data = image_info.get_image_data();
   ViewFile(image_data).seek(location).write(secret_key_view);
 
-  const auto key_string = secret_key_view.to_string();
+  const auto key_string = secret_key_view.to_string<KeyString>();
   CLOUD_PRINTER_TRACE("final key is " | key_string);
 
   image_info.set_secret_key(key_string).set_image_data(image_data);
