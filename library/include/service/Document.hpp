@@ -3,7 +3,7 @@
 #ifndef CLOUD_API_CLOUD_DOCUMENT_HPP
 #define CLOUD_API_CLOUD_DOCUMENT_HPP
 
-#include <cloud/Cloud.hpp>
+#include <cloud/CloudAccess.hpp>
 #include <crypto/Random.hpp>
 #include <json/Json.hpp>
 #include <printer/Printer.hpp>

@@ -37,7 +37,7 @@ Project &Project::save_build(const SaveBuild &options) {
   API_ASSERT(options.project_path().is_empty() == false);
   // does the current version already exist
   sys::Version version(get_version());
-  set_user_id(cloud().credentials().get_uid_cstring());
+  set_user_id(cloud_service().store().credentials().get_uid_cstring());
 
   // check the current version against the versions in the build list
   if (is_build_version_valid(version) == false) {
@@ -91,7 +91,7 @@ Project &Project::save_build(const SaveBuild &options) {
 
   if (
     existing_project.get_team_id().is_empty()
-    && existing_project.get_user_id() != cloud().credentials().get_uid()) {
+    && existing_project.get_user_id() != cloud_service().store().credentials().get_uid()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EPERM);
     return *this;
   }

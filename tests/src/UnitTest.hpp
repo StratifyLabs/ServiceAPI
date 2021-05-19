@@ -16,12 +16,12 @@ class UnitTest : public test::Test {
 public:
   UnitTest(var::StringView name)
     : test::Test(name),
-      m_cloud("cloudapitest-2ec81", "AIzaSyCFaqqhpCAQIOXQbtmvcXTvuerk2tPE6tI") {
-    m_cloud.set_default_printer(printer());
+      m_cloud_service("cloudapitest-2ec81", "AIzaSyCFaqqhpCAQIOXQbtmvcXTvuerk2tPE6tI") {
+    m_cloud_service.set_default_printer(printer());
   }
 
   bool execute_class_api_case() {
-    Document::set_default_cloud(m_cloud);
+    Document::set_default_cloud_service(m_cloud_service);
 
     TEST_ASSERT_RESULT(login_test());
 #if 0
@@ -271,7 +271,7 @@ public:
 
   bool user_test() {
 
-    const StringView user_id = m_cloud.credentials().get_uid();
+    const StringView user_id = m_cloud_service.store().credentials().get_uid();
     User user;
     user.set_permissions(User::Permissions::public_).set_id(user_id).save();
     API_RESET_ERROR();
@@ -321,7 +321,7 @@ public:
         .set_create(true)
         .set_read(true)
         .set_write(false)
-        .set_id(m_cloud.credentials().get_uid())
+        .set_id(m_cloud_service.store().credentials().get_uid())
         .save();
     }
 
@@ -401,12 +401,12 @@ public:
 
   bool login_test() {
     TEST_ASSERT(
-      m_cloud.login("test@stratifylabs.co", "testing-user").is_success());
+      m_cloud_service.cloud().login("test@stratifylabs.co", "testing-user").is_success());
     return true;
   }
 
 private:
-  cloud::Cloud m_cloud;
+  cloud::CloudService m_cloud_service;
   Job::Server m_job_server;
   Mutex cloud_mutex;
 };

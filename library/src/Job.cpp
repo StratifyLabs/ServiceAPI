@@ -18,8 +18,8 @@ Job::publish(const JsonValue &input, const chrono::MicroTime &timeout) {
 
   // does the job exists
   Job::Object job_object
-    = cloud()
-        .get_database_value(object_path, cloud::Cloud::IsRequestShallow(true))
+    = cloud_service().database()
+        .get_value(object_path, cloud::Cloud::IsRequestShallow(true))
         .to_object();
 
   if (job_object.is_valid()) {
@@ -31,12 +31,12 @@ Job::publish(const JsonValue &input, const chrono::MicroTime &timeout) {
     IOValue input_value("", crypto_key, input);
 
     timeout_timer.restart();
-    KeyString input_id = cloud().create_database_object(
+    KeyString input_id = cloud_service().database().create_object(
       Path(object_path) / "input",
       input_value.get_value());
     if (input_id.is_empty()) {
       CLOUD_PRINTER_TRACE(
-        "Failed to create object " + cloud().database_traffic());
+        "Failed to create object " + cloud_service().database().traffic());
       return json::JsonNull();
     }
 
@@ -45,10 +45,10 @@ Job::publish(const JsonValue &input, const chrono::MicroTime &timeout) {
     // wait for result to post
     do {
 
-      object = cloud().get_database_value(Path(object_path) / "output");
+      object = cloud_service().database().get_value(Path(object_path) / "output");
       if (object.at(input_id).is_valid()) {
         // job is complete -- delete the output
-        cloud().remove_database_object(Path(object_path) / "output" / input_id);
+        cloud_service().database().remove_object(Path(object_path) / "output" / input_id);
         return IOValue("", object.at(input_id)).decrypt_value(crypto_key);
       }
       wait(5_seconds);
@@ -60,7 +60,7 @@ Job::publish(const JsonValue &input, const chrono::MicroTime &timeout) {
 }
 
 bool Job::ping(const var::StringView id) {
-  cloud().get_database_value(
+  cloud_service().database().get_value(
     Path("jobs") / id,
     NullFile(),
     cloud::Cloud::IsRequestShallow(true));
@@ -119,8 +119,8 @@ Job::Server::~Server() {
   if (id().is_empty() == false) {
     // delete job
     const Path job_path = Path("jobs") / id();
-    cloud().remove_database_object(job_path.string_view());
-    cloud().remove_document(job_path.string_view());
+    cloud_service().database().remove_object(job_path.string_view());
+    cloud_service().store().remove_document(job_path.string_view());
   }
 }
 
@@ -136,7 +136,7 @@ Job::Server::start(const var::StringView type, const Job &job_document) {
 
   m_id = job.get_document_id();
 
-  cloud().create_database_object(
+  cloud_service().database().create_object(
     "jobs",
     Job::Object().set_type(type),
     job.get_document_id());
@@ -151,6 +151,7 @@ Job::Server::start(const var::StringView type, const Job &job_document) {
 
   listen_file.set_context(this).set_write_callback(
     [](void *context, int location, const var::View view) -> int {
+      MCU_UNUSED_ARGUMENT(location);
       Job::Server *self = reinterpret_cast<Job::Server *>(context);
       self->process_input(JsonDocument().from_string(
         StringView(view.to_const_char(), view.size())));
@@ -158,7 +159,7 @@ Job::Server::start(const var::StringView type, const Job &job_document) {
       return self->is_stop() == false ? view.size() : -1;
     });
 
-  cloud().listen_database(job_path, listen_file);
+  cloud_service().database().listen(job_path, listen_file);
 
   return *this;
 }
@@ -168,7 +169,7 @@ void Job::Server::process_input(const json::JsonValue &data) {
     const Path path = Path("jobs") / id();
 
     Job::Object object
-      = cloud().get_database_value(path.string_view()).to_object();
+      = cloud_service().database().get_value(path.string_view()).to_object();
 
     auto input_list = object.get_input();
 
@@ -181,12 +182,12 @@ void Job::Server::process_input(const json::JsonValue &data) {
           object.get_type(),
           input_list.at(input.key()).decrypt_value(crypto_key()));
 
-        cloud().create_database_object(
+        cloud_service().database().create_object(
           Path(path) / "output",
           Job::IOValue("", crypto_key(), output).get_value(),
           input.key());
 
-        cloud().remove_database_object(Path(path) / "input" / input.key());
+        cloud_service().database().remove_object(Path(path) / "input" / input.key());
       }
     }
   } else {

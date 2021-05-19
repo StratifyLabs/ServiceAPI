@@ -64,7 +64,7 @@ Build::Build(const Construct &options)
     ImageInfo image_info = build_image_info(options.build_name());
 
     DataFile image;
-    cloud().get_storage_object(
+    cloud_service().storage().get_object(
       create_storage_path(options.build_name()),
       image);
 
@@ -99,10 +99,10 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     u32 size;
   } secret_key_t;
 
-  secret_key_t key = {0};
+  secret_key_t key{};
 
   // using the legacy approach
-  mcu_board_config_t mcu_board_config = {0};
+  mcu_board_config_t mcu_board_config{};
   json::JsonKeyValueList<SectionImageInfo> section_list;
 
   {
@@ -462,7 +462,7 @@ void Build::interface_save() {
 
     KeyString message;
     message.format("%d of %d", count, list.count());
-    cloud().create_storage_object(
+    cloud_service().storage().create_object(
       create_storage_path(build_image_info.get_name()),
       encrypted_file.seek(0),
       message.string_view());

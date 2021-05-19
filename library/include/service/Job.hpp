@@ -90,7 +90,7 @@ public:
       std::swap(m_context, a.m_context);
       std::swap(m_callback, a.m_callback);
       std::swap(m_crypto_key, a.m_crypto_key);
-      set_cloud(a.cloud());
+      set_cloud_service(a.cloud_service());
     }
   };
 

@@ -12,7 +12,7 @@ using namespace service;
 
 var::Vector<json::JsonObject>
 Document::list(var::StringView path, var::StringView mask) {
-  JsonObject response = cloud().list_documents(path, mask);
+  JsonObject response = cloud_service().store().list_documents(path, mask);
   var::Vector<json::JsonObject> result;
   JsonArray documents = response.at("documents").to_array();
   for (u32 i = 0; i < documents.count(); i++) {
@@ -39,7 +39,7 @@ Document::Document(const var::StringView path, const Id &id)
   : m_path(path), m_id(id) {
   if (id.is_empty() == false) {
     api::ErrorGuard error_guard;
-    to_object() = cloud().get_document(Path(path) / id);
+    to_object() = cloud_service().store().get_document(Path(path) / id);
     m_is_existing = is_success();
     m_is_imported = false;
     CLOUD_PRINTER_TRACE(
@@ -56,7 +56,7 @@ void Document::update_is_existing() {
     if (get_document_id().is_empty() == false) {
       CLOUD_PRINTER_TRACE("Checking to see if " | get_document_id() | " exists in the cloud");
       api::ErrorGuard error_guard;
-      cloud().get_document(get_path_with_id());
+      cloud_service().store().get_document(get_path_with_id());
       m_is_existing = is_success();
       CLOUD_PRINTER_TRACE(get_document_id() | " exists? " | (m_is_existing ? "true" : "false"));
     }
@@ -66,7 +66,7 @@ void Document::update_is_existing() {
 void Document::interface_remove() {
   update_is_existing();
   if (is_existing()) {
-    cloud().remove_document(get_path_with_id());
+    cloud_service().store().remove_document(get_path_with_id());
     m_is_existing = false;
   }
 }
@@ -84,7 +84,7 @@ void Document::interface_save() {
     | (is_existing() ? StringView("true") : StringView("false")));
 
   set_timestamp(DateTime::get_system_time().ctime());
-  set_user_id(cloud().credentials().get_uid_cstring());
+  set_user_id(cloud_service().store().credentials().get_uid_cstring());
   {
     api::ErrorGuard error_guard;
     convert_tags_to_list(); // tags -> tagList
@@ -105,7 +105,7 @@ void Document::interface_save() {
   if (get_document_id().is_empty() || !is_existing()) {
     CLOUD_PRINTER_TRACE("document path is " | path().string_view());
     CLOUD_PRINTER_TRACE("creating new document with id: " | get_document_id());
-    const auto result = cloud().create_document(
+    const auto result = cloud_service().store().create_document(
       path().string_view(),
       to_object(),
       get_document_id());
@@ -117,7 +117,7 @@ void Document::interface_save() {
     } else {
       CLOUD_PRINTER_TRACE("there was an error creating the document");
       JsonObject error
-        = JsonDocument().from_string(cloud().document_error()).to_object();
+        = JsonDocument().from_string(cloud_service().store().error_string()).to_object();
       if (
         error.at("error").to_object().at("status").to_string()
         == "ALREADY_EXISTS") {
@@ -131,9 +131,9 @@ void Document::interface_save() {
 
   // add keys from object to update mask
   CLOUD_PRINTER_TRACE("patching document with id " | id());
-  cloud().document_update_mask_fields().clear();
+  cloud_service().store().document_update_mask_fields().clear();
   set_document_id(id());
-  cloud().patch_document(get_path_with_id().string_view(), to_object());
+  cloud_service().store().patch_document(get_path_with_id().string_view(), to_object());
   return;
 }
 

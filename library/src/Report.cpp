@@ -39,19 +39,19 @@ Report &Report::save(const fs::FileObject &content) {
   DocumentAccess<Report>::save();
   API_RETURN_VALUE_IF_ERROR(*this);
 
-  cloud().create_storage_object(get_storage_path(), encrypted_file.seek(0));
+  cloud_service().storage().create_object(get_storage_path(), encrypted_file.seek(0));
   return *this;
 }
 
 void Report::download_contents(const fs::FileObject &destination) {
 
   if (get_key().is_empty()) {
-    cloud().get_storage_object(get_storage_path(), destination);
+    cloud_service().storage().get_object(get_storage_path(), destination);
 
   } else {
 
     DataFile encrypted_file;
-    cloud().get_storage_object(get_storage_path(), encrypted_file);
+    cloud_service().storage().get_object(get_storage_path(), encrypted_file);
 
     m_secret_key = Aes::Key(
       Aes::Key::Construct().set_initialization_vector(get_iv()).set_key(
