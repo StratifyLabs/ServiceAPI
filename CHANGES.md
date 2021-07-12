@@ -1,3 +1,3 @@
-# Pre-Release
+# Version 1.0.0
 
-No releases yet.
+Initial Stable Release
