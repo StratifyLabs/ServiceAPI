@@ -533,6 +533,16 @@ void Installer::install_application_image(
 
   if (is_success()) {
     print_transfer_info(image, transfer_timer);
+  } else {
+    switch(error().error_number()){
+    case ENOSPC:
+      API_RETURN_ASSIGN_ERROR("no space left on the target", ENOSPC);
+    case EIO:
+      API_RETURN_ASSIGN_ERROR("IO error while installing", EIO);
+    case EROFS:
+      API_RETURN_ASSIGN_ERROR("cannot install on read-only file system", EROFS);
+    }
+
   }
 
   return;
