@@ -38,7 +38,7 @@ Document::list(var::StringView path, var::StringView mask) {
 Document::Document(const var::StringView path, const Id &id)
   : m_path(path), m_id(id) {
   if (id.is_empty() == false) {
-    api::ErrorGuard error_guard;
+    api::ErrorScope es;
     to_object() = cloud_service().store().get_document(Path(path) / id);
     m_is_existing = is_success();
     m_is_imported = false;

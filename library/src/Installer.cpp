@@ -720,29 +720,37 @@ void Installer::save_image_locally(
   };
 
   Printer::Object sections_object(printer(), "sections");
-  printer().key(".text", link_path.prefix() | destination);
-
-  CLOUD_PRINTER_TRACE("save binary file at path " & destination);
-  // hash for image was previously added
-  Link::File(
-    File::IsOverwrite::yes,
-    destination,
-    OpenMode::read_write(),
-    Permissions(0777),
-    link_path.driver())
-    .write(
-      image,
-      File::Write().set_progress_callback(printer().progress_callback()));
+  {
+    Printer::Object sections_object(printer(), ".text");
+    printer().key("path", link_path.prefix() | destination);
+    CLOUD_PRINTER_TRACE("save binary file at path " & destination);
+    // hash for image was previously added
+    Link::File(
+      File::IsOverwrite::yes,
+      destination,
+      OpenMode::read_write(),
+      Permissions(0777),
+      link_path.driver())
+      .write(
+        image,
+        File::Write().set_progress_callback(printer().progress_callback()));
+  }
 
   JsonKeyValueList<Build::SectionImageInfo> section_image_info
     = build.build_image_info(options.build_name()).get_section_list();
 
   for (const Build::SectionImageInfo &image_info : section_image_info) {
     if (image_info.key().is_empty() == false) {
+
+      {
       const var::PathString section_destination
         = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
+      Printer::Object sections_object(printer(), image_info.key());
 
-      printer().key(image_info.key(), link_path.prefix() | section_destination);
+      printer().key("path", link_path.prefix() | section_destination);
+
+      DataFile data_file;
+      data_file.data() = image_info.get_image_data();
 
       Link::File(
         File::IsOverwrite::yes,
@@ -750,12 +758,14 @@ void Installer::save_image_locally(
         OpenMode::read_write(),
         Permissions(0777),
         link_path.driver())
-        .write(append_hash(
-          image_info.get_image_data(),
-          image_info.key(),
-          options.is_append_hash()));
+        .write(
+          data_file,
+          File::Write().set_progress_callback(printer().progress_callback()));
+
+      }
     }
   }
+  printer().set_progress_key("progress");
 }
 
 void Installer::kill_application(int app_pid) {
