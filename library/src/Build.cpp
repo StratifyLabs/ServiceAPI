@@ -82,7 +82,8 @@ Build::Build(const Construct &options)
       image.data() = decrypted_image.data().resize(image_info.get_size());
     }
 
-    image_info.set_image_data(image.data());
+    image_info.set_signed(Dsa::get_signature(image).is_valid())
+      .set_image_data(image.data());
     return;
   }
 }
@@ -137,7 +138,9 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
   auto program_header_list
     = elf.get_program_header_list(swd::Elf::ProgramHeaderType::load);
 
-  CLOUD_PRINTER_TRACE("ELF has " | NumberString(program_header_list.count()) | " loadable program headers");
+  CLOUD_PRINTER_TRACE(
+    "ELF has " | NumberString(program_header_list.count())
+    | " loadable program headers");
 
   u32 text_start_location = 0;
   for (const swd::Elf::ProgramHeader &program_header : program_header_list) {
@@ -151,22 +154,25 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     if (name == ".text" || name == ".data") {
       CLOUD_PRINTER_TRACE("adding section text/data to build");
       if (name == ".text") {
-        CLOUD_PRINTER_TRACE("adding text bytes " | NumberString(program_header.memory_size()));
+        CLOUD_PRINTER_TRACE(
+          "adding text bytes " | NumberString(program_header.memory_size()));
         text_start_location = program_header.physical_address();
       } else {
-        CLOUD_PRINTER_TRACE("adding data bytes " | NumberString(program_header.memory_size()));
+        CLOUD_PRINTER_TRACE(
+          "adding data bytes " | NumberString(program_header.memory_size()));
       }
       data_image.write(
         elf.file().seek(program_header.offset()),
         File::Write().set_size(program_header.file_size()));
     } else {
       CLOUD_PRINTER_TRACE("adding section " + name + " to build");
-      section_list.push_back(SectionImageInfo(name).set_image_data(
-        DataFile()
-          .write(
-            elf.file().seek(program_header.offset()),
-            File::Write().set_size(program_header.file_size()))
-          .data()));
+      section_list.push_back(
+        SectionImageInfo(name).set_signed(false).set_image_data(
+          DataFile()
+            .write(
+              elf.file().seek(program_header.offset()),
+              File::Write().set_size(program_header.file_size()))
+            .data()));
     }
   }
 
@@ -180,6 +186,7 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
     = key.address != 0 ? (key.address - text_start_location) & ~0x01 : 0;
 
   return Build::ImageInfo()
+    .set_signed(false)
     .set_image_data(data_image.data())
     .set_size(data_image.size())
     .set_secret_key_position(key_address)
@@ -353,6 +360,15 @@ var::Data Build::get_image(const var::StringView name) const {
 
 Build &Build::set_image(const var::StringView name, const var::Data &image) {
   build_image_info(name).set_image_data(image);
+  return *this;
+}
+
+Build & Build::sign(const crypto::Dsa & dsa){
+  auto build_list = build_image_list();
+  for(auto build: build_list){
+    build.sign(dsa);
+  }
+  set_build_image_list(build_list);
   return *this;
 }
 

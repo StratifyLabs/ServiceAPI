@@ -10,6 +10,7 @@
 #include <var.hpp>
 
 #include "service/Installer.hpp"
+#include "service/Keys.hpp"
 #include "service/Thing.hpp"
 
 using namespace service;
@@ -284,6 +285,32 @@ void Installer::update_os(const Install &options) {
 void Installer::install_build(Build &build, const Install &options) {
   API_RETURN_IF_ERROR();
   CLOUD_PRINTER_TRACE("Installing build type " | build.get_type());
+
+  if (options.sign_key_id().is_empty() == false) {
+
+    if (options.sign_key_password().is_empty()) {
+      API_RETURN_ASSIGN_ERROR("cannot use keys id without a password", EINVAL);
+    }
+
+    if (options.sign_key_password().length() != 64) {
+      API_RETURN_ASSIGN_ERROR(
+        "sign key password must be 64 characters long",
+        EINVAL);
+    }
+
+    Keys keys_document(options.sign_key_id());
+
+    const auto dsa = keys_document.get_digital_signature_algorithm(
+      Aes::Key(Aes::Key::Construct()
+                 .set_key(options.sign_key_password())
+                 .set_initialization_vector(keys_document.get_iv())));
+    API_RETURN_IF_ERROR();
+
+    build.sign(dsa);
+
+    API_RETURN_IF_ERROR();
+  }
+
   if (build.decode_build_type() == Build::Type::application) {
     CLOUD_PRINTER_TRACE("installing application build");
     install_application_build(build, options);
@@ -423,7 +450,9 @@ void Installer::install_os_build(Build &build, const Install &options) {
     Install(options).set_reconnect(
       options.is_reconnect() || options.is_synchronize_thing()));
 
-  if (is_success() && options.is_synchronize_thing()) {
+  if (
+    is_success() && options.is_synchronize_thing()
+    && options.destination().is_empty()) {
     // update the thing with the new version that is installed
     Printer::Object po(printer(), "thing");
 
@@ -534,7 +563,7 @@ void Installer::install_application_image(
   if (is_success()) {
     print_transfer_info(image, transfer_timer);
   } else {
-    switch(error().error_number()){
+    switch (error().error_number()) {
     case ENOSPC:
       API_RETURN_ASSIGN_ERROR("no space left on the target", ENOSPC);
     case EIO:
@@ -542,7 +571,6 @@ void Installer::install_application_image(
     case EROFS:
       API_RETURN_ASSIGN_ERROR("cannot install on read-only file system", EROFS);
     }
-
   }
 
   return;

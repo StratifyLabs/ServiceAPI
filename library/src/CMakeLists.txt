@@ -7,6 +7,7 @@ set(SOURCES
 	Project.cpp
 	Team.cpp
 	Hardware.cpp
+	Keys.cpp
 	User.cpp
 	Thing.cpp
 	Report.cpp

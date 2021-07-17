@@ -18,6 +18,8 @@ public:
     // if id is provided -- download and install
     API_ACCESS_COMPOUND(Install, var::StringView, project_id);
     API_ACCESS_COMPOUND(Install, var::StringView, team_id);
+    API_ACCESS_COMPOUND(Install, var::StringView, sign_key_id);
+    API_ACCESS_COMPOUND(Install, var::StringView, sign_key_password);
     API_ACCESS_COMPOUND(Install, var::StringView, url);
     API_ACCESS_BOOL(Install, update_os, false);
     API_ACCESS_BOOL(Install, update_apps, false);

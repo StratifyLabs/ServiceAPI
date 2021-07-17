@@ -8,6 +8,7 @@ set(SOURCES
 	service/Team.hpp
 	service/Hardware.hpp
 	service/User.hpp
+	service/Keys.hpp
 	service/Thing.hpp
 	service/Report.hpp
 	service/Job.hpp

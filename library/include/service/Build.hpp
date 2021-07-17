@@ -4,14 +4,24 @@
 #define SERVICE_API_SERVICE_BUILD_HPP
 
 #include <crypto/Sha256.hpp>
+#include <crypto/Ecc.hpp>
 #include <sos/Link.hpp>
 #include <var/Base64.hpp>
+#include <fs/DataFile.hpp>
 
 #include "Document.hpp"
 
 namespace service {
 
 class Build : public DocumentAccess<Build> {
+
+  static var::Data sign_data(const var::Data & data, const crypto::Dsa & dsa){
+    fs::DataFile data_file;
+    data_file.data() = data;
+    dsa.sign(data_file);
+    return data_file.data();
+  }
+
 public:
   class SecretKeyInfo {
   public:
@@ -32,10 +42,20 @@ public:
 
     JSON_ACCESS_STRING(SectionImageInfo, image);
     JSON_ACCESS_INTEGER(SectionImageInfo, padding);
+    JSON_ACCESS_BOOL(SectionImageInfo, signed);
 
     var::Data get_image_data() const {
       return var::Base64()
         .decode(var::StringView(get_image_cstring()));
+    }
+
+    SectionImageInfo &sign(const crypto::Dsa & dsa){
+      if( is_signed() ){
+        return *this;
+      }
+      set_image_data(sign_data(get_image_data(), dsa));
+      set_signed(true);
+      return *this;
     }
 
     SectionImageInfo &set_image_data(var::View image_view) {
@@ -50,6 +70,7 @@ public:
     JSON_ACCESS_STRING(ImageInfo, name);
     JSON_ACCESS_STRING(ImageInfo, image);
     JSON_ACCESS_STRING(ImageInfo, hash);
+    JSON_ACCESS_BOOL(ImageInfo, signed);
     JSON_ACCESS_INTEGER(ImageInfo, size);
     JSON_ACCESS_INTEGER(ImageInfo, padding);
     JSON_ACCESS_STRING_WITH_KEY(ImageInfo, secretKey, secret_key);
@@ -66,7 +87,19 @@ public:
 
     var::Data get_image_data() const {
       return var::Base64().decode(get_image());
-      //.append(var::Data::from_string(get_hash()));
+    }
+
+    ImageInfo &sign(const crypto::Dsa & dsa){
+      if( is_signed() ){
+        return *this;
+      }
+      set_image_data(sign_data(get_image_data(), dsa));
+      set_signed(true);
+      auto local_section_list = section_list();
+      for(auto & section: local_section_list){
+        section.sign(dsa);
+      }
+      return *this;
     }
 
     ImageInfo &set_image_data(const var::View &image_view) {
@@ -76,29 +109,6 @@ public:
     bool operator==(const ImageInfo &info) const {
       return get_name() == info.get_name();
     }
-  };
-
-  class BuildOptions {
-  public:
-    var::String create_storage_path() const {
-      if (
-        project_id().is_empty() || project_name().is_empty()
-        || build_name().is_empty()) {
-        // assert here
-        return var::String();
-      }
-
-      return var::String();
-    }
-
-  private:
-    API_ACCESS_COMPOUND(BuildOptions, var::String, build_name);
-    API_ACCESS_COMPOUND(BuildOptions, var::String, project_id);
-    API_ACCESS_COMPOUND(BuildOptions, var::String, project_name);
-    API_ACCESS_COMPOUND(BuildOptions, var::String, architecture);
-    API_ACCESS_COMPOUND(BuildOptions, var::String, url);
-    API_ACCESS_COMPOUND(BuildOptions, var::String, version);
-    API_ACCESS_COMPOUND(BuildOptions, var::String, storage_path);
   };
 
   class Construct {
@@ -200,7 +210,7 @@ public:
   }
 
   Build &import_url(const var::StringView url);
-  int download(const BuildOptions &options);
+  //int download(const BuildOptions &options);
 
   var::Data get_image(const var::StringView name) const;
   Build &set_image(const var::StringView name, const var::Data &image);
@@ -219,6 +229,8 @@ public:
     m_application_architecture = value;
     return *this;
   }
+
+  Build & sign(const crypto::Dsa& dsa);
 
   var::StringView application_architecture() const {
     if (decode_build_type() == Type::application) {
