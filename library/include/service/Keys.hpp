@@ -30,6 +30,7 @@ public:
 
   JSON_ACCESS_STRING(Keys, type);
   JSON_ACCESS_STRING(Keys, status);
+  JSON_ACCESS_STRING(Keys, name);
   JSON_ACCESS_STRING(Keys, iv);
   JSON_ACCESS_INTEGER_WITH_KEY(Keys, privateKeySize, private_key_size);
   JSON_ACCESS_STRING_WITH_KEY(Keys, publicKey, public_key);

@@ -164,6 +164,8 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
       data_image.write(
         elf.file().seek(program_header.offset()),
         File::Write().set_size(program_header.file_size()));
+      CLOUD_PRINTER_TRACE("data image size is now " | NumberString(data_image.data().size()));
+
     } else {
       CLOUD_PRINTER_TRACE("adding section " + name + " to build");
       section_list.push_back(

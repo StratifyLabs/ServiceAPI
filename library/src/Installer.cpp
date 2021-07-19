@@ -722,7 +722,9 @@ void Installer::save_image_locally(
   Printer::Object sections_object(printer(), "sections");
   {
     Printer::Object sections_object(printer(), ".text");
-    printer().key("path", link_path.prefix() | destination);
+    printer()
+      .key("path", link_path.prefix() | destination)
+      .key("size", NumberString(image.size()));
     CLOUD_PRINTER_TRACE("save binary file at path " & destination);
     // hash for image was previously added
     Link::File(
@@ -743,25 +745,26 @@ void Installer::save_image_locally(
     if (image_info.key().is_empty() == false) {
 
       {
-      const var::PathString section_destination
-        = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
-      Printer::Object sections_object(printer(), image_info.key());
+        const var::PathString section_destination
+          = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
+        Printer::Object sections_object(printer(), image_info.key());
 
-      printer().key("path", link_path.prefix() | section_destination);
+        DataFile data_file;
+        data_file.data() = image_info.get_image_data();
 
-      DataFile data_file;
-      data_file.data() = image_info.get_image_data();
+        printer()
+          .key("path", link_path.prefix() | section_destination)
+          .key("size", NumberString(data_file.data().size()));
 
-      Link::File(
-        File::IsOverwrite::yes,
-        section_destination,
-        OpenMode::read_write(),
-        Permissions(0777),
-        link_path.driver())
-        .write(
-          data_file,
-          File::Write().set_progress_callback(printer().progress_callback()));
-
+        Link::File(
+          File::IsOverwrite::yes,
+          section_destination,
+          OpenMode::read_write(),
+          Permissions(0777),
+          link_path.driver())
+          .write(
+            data_file,
+            File::Write().set_progress_callback(printer().progress_callback()));
       }
     }
   }
