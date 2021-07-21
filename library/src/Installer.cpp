@@ -306,6 +306,7 @@ void Installer::install_build(Build &build, const Install &options) {
                  .set_initialization_vector(keys_document.get_iv())));
     API_RETURN_IF_ERROR();
 
+    //sign the build if it isn't signed yet
     build.sign(dsa);
 
     API_RETURN_IF_ERROR();
@@ -381,6 +382,24 @@ void Installer::install_os_build(Build &build, const Install &options) {
     StringView thing_team = connection()->info().team_id();
     if (thing_team.is_empty()) {
       thing_team = options.team_id();
+    }
+
+    if (options.public_key_id().is_empty() == false) {
+      Keys keys(options.public_key_id());
+      API_RETURN_IF_ERROR();
+
+      const auto public_key_string = keys.get_public_key();
+      const auto public_key_string_length = public_key_string.length();
+      if (public_key_string_length != 128) {
+        API_RETURN_ASSIGN_ERROR(
+          "public key length is invalid: 128 != "
+            | NumberString(public_key_string_length),
+          EINVAL);
+      }
+
+      var::Array<u8, 64> public_key;
+      View(public_key).from_string(public_key_string);
+      build.insert_public_key(options.build_name(), public_key);
     }
 
     if (existing_secret_key.is_empty() && !options.is_rekey_thing()) {
@@ -601,6 +620,31 @@ void Installer::install_os_image(
     } else {
       CLOUD_PRINTER_TRACE("connected to bootloader");
     }
+
+    const bool is_signature_required = connection()->is_signature_required();
+
+    if (is_signature_required) {
+      // verify the signature is valid before attempting to install
+      auto public_key = connection()->get_public_key();
+
+      printer().key("publicKey", View(public_key).to_string<GeneralString>());
+
+      const auto signature_info = Dsa::get_signature_info(image.seek(0));
+
+      const auto is_verified = Dsa::verify(image.seek(0), Dsa::Key(public_key));
+      printer().key("hash", View(signature_info.hash()).to_string<GeneralString>());
+      printer().key("signature", signature_info.signature().to_string());
+      printer().key_bool("isSignatureVerified", is_verified);
+
+      if (is_verified == false) {
+        API_RETURN_ASSIGN_ERROR(
+          "the bootloader requires a signed image, but this image does not "
+          "have a valid signature",
+          EINVAL);
+      }
+    }
+
+    // make sure image is signed
 
     API_RETURN_IF_ERROR();
 

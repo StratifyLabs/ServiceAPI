@@ -74,6 +74,7 @@ public:
     JSON_ACCESS_INTEGER(ImageInfo, size);
     JSON_ACCESS_INTEGER(ImageInfo, padding);
     JSON_ACCESS_STRING_WITH_KEY(ImageInfo, secretKey, secret_key);
+    JSON_ACCESS_STRING_WITH_KEY(ImageInfo, publicKey, public_key);
     JSON_ACCESS_INTEGER_WITH_KEY(
       ImageInfo,
       secretKeyPosition,
@@ -203,6 +204,10 @@ public:
     const var::StringView build_name,
     const var::View secret_key);
 
+  Build &insert_public_key(
+    const var::StringView build_name,
+    const var::View secret_key);
+
   bool is_build_image_included() const {
     // buildIncludesImage is a legacy support thing
     return is_image_included()
@@ -266,6 +271,11 @@ private:
   void migrate_build_info_list_20200518();
 
   static var::StringView get_arch(const var::StringView name);
+
+
+  bool insert_pure_code_secret_key(
+    var::Data & image_data,
+    const var::View secret_key);
 };
 
 } // namespace service

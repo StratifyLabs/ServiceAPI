@@ -164,7 +164,8 @@ Build::ImageInfo Build::import_elf_file(const var::StringView path) {
       data_image.write(
         elf.file().seek(program_header.offset()),
         File::Write().set_size(program_header.file_size()));
-      CLOUD_PRINTER_TRACE("data image size is now " | NumberString(data_image.data().size()));
+      CLOUD_PRINTER_TRACE(
+        "data image size is now " | NumberString(data_image.data().size()));
 
     } else {
       CLOUD_PRINTER_TRACE("adding section " + name + " to build");
@@ -365,12 +366,47 @@ Build &Build::set_image(const var::StringView name, const var::Data &image) {
   return *this;
 }
 
-Build & Build::sign(const crypto::Dsa & dsa){
+Build &Build::sign(const crypto::Dsa &dsa) {
   auto build_list = build_image_list();
-  for(auto build: build_list){
+  for (auto build : build_list) {
     build.sign(dsa);
   }
   set_build_image_list(build_list);
+  return *this;
+}
+
+Build &Build::insert_public_key(
+  const var::StringView build_name,
+  const var::View public_key){
+
+  ImageInfo image_info = build_image_info(normalize_name(build_name));
+
+  API_ASSERT(public_key.size() == 64);
+
+  const auto location = image_info.get_secret_key_position();
+  const auto size = image_info.get_secret_key_size();
+  CLOUD_PRINTER_TRACE(
+    "public key location is " | NumberString(location, "0x%08x"));
+  CLOUD_PRINTER_TRACE("public key size is " | NumberString(size));
+
+  if( size != 64 ){
+    CLOUD_PRINTER_TRACE("public key size must be 64");
+    return *this;
+  }
+
+  auto image_data = image_info.get_image_data();
+  ViewFile(image_data).seek(location).write(public_key);
+  const auto key_string = public_key.to_string<GeneralString>();
+  CLOUD_PRINTER_TRACE("final key is " | key_string);
+
+  printer().open_object("publicKey")
+    .key("key", key_string)
+    .key("location", NumberString(location, "0x%08x"))
+    .key("size", NumberString(size))
+    .close_object();
+
+  image_info.set_public_key(key_string).set_image_data(image_data);
+
   return *this;
 }
 
@@ -381,17 +417,7 @@ Build &Build::insert_secret_key(
 
   ImageInfo image_info = build_image_info(normalize_name(build_name));
 
-  const u32 location = image_info.get_secret_key_position();
-  const u32 size = image_info.get_secret_key_size();
-  CLOUD_PRINTER_TRACE(
-    "secret key location is " | NumberString(location, "0x%08x"));
-  CLOUD_PRINTER_TRACE("secret key size is " | NumberString(size));
-  if (size == 0) {
-    return *this;
-  }
-
   Aes::Key new_key;
-
   View secret_key_view
     = secret_key.size() ? secret_key : View(new_key.key256());
 
@@ -400,15 +426,71 @@ Build &Build::insert_secret_key(
   CLOUD_PRINTER_TRACE(
     "generated key size is " | NumberString(new_key.key256().count()));
 
-  Data image_data = image_info.get_image_data();
-  ViewFile(image_data).seek(location).write(secret_key_view);
+  const u32 location = image_info.get_secret_key_position();
+  const u32 size = image_info.get_secret_key_size();
+  CLOUD_PRINTER_TRACE(
+    "secret key location is " | NumberString(location, "0x%08x"));
+  CLOUD_PRINTER_TRACE("secret key size is " | NumberString(size));
 
-  const auto key_string = secret_key_view.to_string<KeyString>();
+  Data image_data = image_info.get_image_data();
+
+  if (size != 32) {
+    if( insert_pure_code_secret_key(image_data, secret_key_view) == false ){
+      return *this;
+    }
+  } else {
+    ViewFile(image_data).seek(location).write(secret_key_view);
+  }
+
+  const auto key_string = secret_key_view.to_string<GeneralString>();
   CLOUD_PRINTER_TRACE("final key is " | key_string);
 
   image_info.set_secret_key(key_string).set_image_data(image_data);
 
   return *this;
+}
+
+bool Build::insert_pure_code_secret_key(
+  var::Data &image_data,
+  const var::View secret_key) {
+
+  //two copies are inserted
+  auto insert_secret_key = [&](){
+    const u8 compiled_key[] = AUTH_PURE_CODE_COMPILED_KEY_HEADER;
+    const auto compiled_key_view = View(compiled_key);
+
+    const auto offset = View(image_data).find(compiled_key_view);
+
+    CLOUD_PRINTER_TRACE(
+      "compiled key offset is " | NumberString(offset, "0x%08x"));
+
+    if (offset == View::npos) {
+      CLOUD_PRINTER_TRACE("Nowhere to insert a pure code secret key");
+      return false;
+    }
+
+    View image_key_view(image_data);
+    image_key_view.pop_front(offset);
+
+    for (u32 position = 0; position < 32; position++) {
+      const u16 value = ((0xA0 + position)) | (0x23 << 8);
+      const auto key_offset = image_key_view.find(View(value));
+      if (key_offset == View::npos) {
+        CLOUD_PRINTER_TRACE(
+          "Failed to insert key -- this should never happen "
+          | NumberString(value, "%04x"));
+        return false;
+      }
+
+      const auto insert_value = secret_key.to_const_u8()[position];
+      image_key_view.to_u8()[key_offset] = insert_value;
+      image_key_view.pop_front(key_offset+2);
+    }
+
+    return true;
+  };
+
+  return insert_secret_key() && insert_secret_key();
 }
 
 void Build::interface_remove() {
