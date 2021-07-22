@@ -228,7 +228,11 @@ public:
 
   Build &insert_public_key(
     const var::StringView build_name,
-    const var::View secret_key);
+    const var::View public_key);
+
+  Build &insert_public_key(
+    ImageInfo & image_info,
+    const var::View public_key);
 
   bool is_build_image_included() const {
     // buildIncludesImage is a legacy support thing

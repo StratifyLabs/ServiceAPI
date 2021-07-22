@@ -392,6 +392,12 @@ Build &Build::insert_public_key(
   const var::View public_key) {
 
   ImageInfo image_info = build_image_info(normalize_name(build_name));
+  return insert_public_key(image_info, public_key);
+}
+
+Build &Build::insert_public_key(
+  ImageInfo & image_info,
+  const var::View public_key) {
 
   API_ASSERT(public_key.size() == 64);
 
@@ -422,6 +428,7 @@ Build &Build::insert_public_key(
 
   return *this;
 }
+
 
 Build &Build::insert_secret_key(
   const var::StringView build_name,

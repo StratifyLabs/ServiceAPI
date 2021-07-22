@@ -141,6 +141,14 @@ Project &Project::save_build(const SaveBuild &options) {
 
     build.sign(dsa);
 
+    //the boot builds need to be keyed with the public key
+    for (auto image_info: list) {
+      if( image_info.get_name().find("_boot_") != StringView::npos ){
+        printer::Printer::Object po(printer(), "addPublicKey" & image_info.get_name());
+        build.insert_public_key(image_info, keys_document.get_dsa_public_key().data());
+      }
+    }
+
     printer::Printer::Object po(printer(), "signatureInfo");
     printer()
       .key("keyId", keys_document.get_document_id())
@@ -159,6 +167,7 @@ Project &Project::save_build(const SaveBuild &options) {
         .key("hash", View(signature_info.hash()).to_string<GeneralString>())
         .key("signature", signature_info.signature().to_string())
         .key_bool("isVerified", is_verified);
+
     };
 
     for (const auto &image_info : list) {
