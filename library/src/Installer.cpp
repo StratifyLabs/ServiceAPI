@@ -306,7 +306,7 @@ void Installer::install_build(Build &build, const Install &options) {
                  .set_initialization_vector(keys_document.get_iv())));
     API_RETURN_IF_ERROR();
 
-    //sign the build if it isn't signed yet
+    // sign the build if it isn't signed yet
     build.sign(dsa);
 
     API_RETURN_IF_ERROR();
@@ -626,15 +626,14 @@ void Installer::install_os_image(
     if (is_signature_required) {
       // verify the signature is valid before attempting to install
       auto public_key = connection()->get_public_key();
-
-      printer().key("publicKey", View(public_key).to_string<GeneralString>());
-
       const auto signature_info = Dsa::get_signature_info(image.seek(0));
-
       const auto is_verified = Dsa::verify(image.seek(0), Dsa::Key(public_key));
-      printer().key("hash", View(signature_info.hash()).to_string<GeneralString>());
-      printer().key("signature", signature_info.signature().to_string());
-      printer().key_bool("isSignatureVerified", is_verified);
+
+      printer()
+        .key("publicKey", View(public_key).to_string<GeneralString>())
+        .key("hash", View(signature_info.hash()).to_string<GeneralString>())
+        .key("signature", signature_info.signature().to_string())
+        .key_bool("isSignatureVerified", is_verified);
 
       if (is_verified == false) {
         API_RETURN_ASSIGN_ERROR(

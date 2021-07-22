@@ -28,6 +28,14 @@ public:
 
   crypto::DigitalSignatureAlgorithm get_digital_signature_algorithm(const crypto::Aes::Key & key) const;
 
+  crypto::Dsa::Key get_dsa_public_key() const {
+    return crypto::Dsa::Key(get_public_key());
+  }
+
+  crypto::Dsa::Key get_dsa_private_key() const {
+    return crypto::Dsa::Key(get_private_key());
+  }
+
   JSON_ACCESS_STRING(Keys, type);
   JSON_ACCESS_STRING(Keys, status);
   JSON_ACCESS_STRING(Keys, name);

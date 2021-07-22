@@ -51,6 +51,8 @@ public:
     API_ACCESS_COMPOUND(SaveBuild, var::StringView, architecture);
     API_ACCESS_COMPOUND(SaveBuild, var::StringView, version);
     API_ACCESS_COMPOUND(SaveBuild, var::StringView, build_name);
+    API_ACCESS_COMPOUND(SaveBuild, var::StringView, sign_key);
+    API_ACCESS_COMPOUND(SaveBuild, var::StringView, sign_key_password);
   };
 
   Project &save_build(const SaveBuild &options);

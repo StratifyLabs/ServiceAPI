@@ -55,17 +55,11 @@ Build::Build(const Construct &options)
     Aes::Key::Construct().set_key(get_key()).set_initialization_vector(
       get_iv()));
 
-  // download the build images
-  if (options.build_name().is_empty() == false) {
 
-    API_ASSERT(options.project_id().is_empty() == false);
-    API_ASSERT(options.build_name().is_empty() == false);
-
-    ImageInfo image_info = build_image_info(options.build_name());
-
+  auto download_image = [&](StringView name, size_t size) -> var::Data{
     DataFile image;
     cloud_service().storage().get_object(
-      create_storage_path(options.build_name()),
+      create_storage_path(name),
       image);
 
     if (get_key().is_empty() == false) {
@@ -79,11 +73,30 @@ Build::Build(const Construct &options)
                 .set_initialization_vector(key.initialization_vector()))
             .move();
 
-      image.data() = decrypted_image.data().resize(image_info.get_size());
+      image.data() = decrypted_image.data().resize(size);
+    }
+    return image.data();
+
+  };
+
+  // download the build images
+  if (options.build_name().is_empty() == false) {
+
+    API_ASSERT(options.project_id().is_empty() == false);
+    API_ASSERT(options.build_name().is_empty() == false);
+
+    ImageInfo image_info = build_image_info(options.build_name());
+    auto data = download_image(options.build_name(), image_info.get_size());
+    image_info.set_image_data(data);
+
+    auto section_list = image_info.section_list();
+    for(auto & section: section_list){
+      if( section.get_image() == "<base64>"){
+        auto data = download_image(options.build_name() & "." & section.key(), section.get_size());
+        section.set_image_data(data);
+      }
     }
 
-    image_info.set_signed(Dsa::get_signature(image).is_valid())
-      .set_image_data(image.data());
     return;
   }
 }
@@ -371,13 +384,12 @@ Build &Build::sign(const crypto::Dsa &dsa) {
   for (auto build : build_list) {
     build.sign(dsa);
   }
-  set_build_image_list(build_list);
   return *this;
 }
 
 Build &Build::insert_public_key(
   const var::StringView build_name,
-  const var::View public_key){
+  const var::View public_key) {
 
   ImageInfo image_info = build_image_info(normalize_name(build_name));
 
@@ -389,7 +401,7 @@ Build &Build::insert_public_key(
     "public key location is " | NumberString(location, "0x%08x"));
   CLOUD_PRINTER_TRACE("public key size is " | NumberString(size));
 
-  if( size != 64 ){
+  if (size != 64) {
     CLOUD_PRINTER_TRACE("public key size must be 64");
     return *this;
   }
@@ -399,7 +411,8 @@ Build &Build::insert_public_key(
   const auto key_string = public_key.to_string<GeneralString>();
   CLOUD_PRINTER_TRACE("final key is " | key_string);
 
-  printer().open_object("publicKey")
+  printer()
+    .open_object("publicKey")
     .key("key", key_string)
     .key("location", NumberString(location, "0x%08x"))
     .key("size", NumberString(size))
@@ -435,7 +448,7 @@ Build &Build::insert_secret_key(
   Data image_data = image_info.get_image_data();
 
   if (size != 32) {
-    if( insert_pure_code_secret_key(image_data, secret_key_view) == false ){
+    if (insert_pure_code_secret_key(image_data, secret_key_view) == false) {
       return *this;
     }
   } else {
@@ -454,8 +467,8 @@ bool Build::insert_pure_code_secret_key(
   var::Data &image_data,
   const var::View secret_key) {
 
-  //two copies are inserted
-  auto insert_secret_key = [&](){
+  // two copies are inserted
+  auto insert_secret_key = [&]() {
     const u8 compiled_key[] = AUTH_PURE_CODE_COMPILED_KEY_HEADER;
     const auto compiled_key_view = View(compiled_key);
 
@@ -484,7 +497,7 @@ bool Build::insert_pure_code_secret_key(
 
       const auto insert_value = secret_key.to_const_u8()[position];
       image_key_view.to_u8()[key_offset] = insert_value;
-      image_key_view.pop_front(key_offset+2);
+      image_key_view.pop_front(key_offset + 2);
     }
 
     return true;
@@ -535,15 +548,14 @@ void Build::interface_save() {
     Aes::Key::Construct().set_key(get_key()).set_initialization_vector(
       get_iv()));
 
+  // get a copy of the build image list
   const auto list = get_build_image_list();
-
   remove_build_image_data();
+
   DocumentAccess<Build>::interface_save();
   API_RETURN_IF_ERROR();
 
-  for (const ImageInfo &build_image_info : list) {
-
-    Data data = build_image_info.get_image_data();
+  auto upload_image = [&](Data & data, const var::StringView name, size_t count, size_t list_count){
 
     Array<u8, 16> padding;
     View padding_view(padding);
@@ -560,13 +572,27 @@ void Build::interface_save() {
               .set_initialization_vector(key.initialization_vector()))
           .move();
 
-    KeyString message;
-    message.format("%d of %d", count, list.count());
     cloud_service().storage().create_object(
-      create_storage_path(build_image_info.get_name()),
+      create_storage_path(name),
       encrypted_file.seek(0),
-      message.string_view());
+      KeyString().format("%d of %d", count, list_count));
+  };
 
+  for (const ImageInfo &build_image_info : list) {
+    auto data = build_image_info.get_image_data();
+    const auto build_name = build_image_info.get_name();
+
+    printer::Printer::Object build_objects(printer(), build_name);
+
+    upload_image(data, build_name, count, list.count());
+
+    printer::Printer::Object sections_object(printer(), "sections");
+    const auto section_list = build_image_info.section_list();
+    size_t section_count = 1;
+    for(const auto & section: section_list){
+      auto data = section.get_image_data();
+      upload_image(data, build_name & "." & section.key(), section_count++, section_list.count());
+    }
     count++;
   }
 }

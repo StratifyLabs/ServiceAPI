@@ -9,6 +9,7 @@
 #include <var.hpp>
 
 #include "service/Build.hpp"
+#include "service/Keys.hpp"
 #include "service/Project.hpp"
 
 using namespace service;
@@ -65,11 +66,12 @@ Project &Project::save_build(const SaveBuild &options) {
     printer().key("id", id().string_view());
 
     Build::Type type = Build::decode_build_type(get_type());
-    const char * type_command = (type == Build::Type::os) ? "os" : "app";
+    const char *type_command = (type == Build::Type::os) ? "os" : "app";
     printer().key(
       "tip",
       String().format(
-        "use `sl %s.publish:path=%s,header` to export settings to `sl_config.h`",
+        "use `sl %s.publish:path=%s,header` to export settings to "
+        "`sl_config.h`",
         type_command,
         String(options.project_path()).cstring()));
     return *this;
@@ -91,7 +93,8 @@ Project &Project::save_build(const SaveBuild &options) {
 
   if (
     existing_project.get_team_id().is_empty()
-    && existing_project.get_user_id() != cloud_service().store().credentials().get_uid()) {
+    && existing_project.get_user_id()
+         != cloud_service().store().credentials().get_uid()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EPERM);
     return *this;
   }
@@ -117,6 +120,64 @@ Project &Project::save_build(const SaveBuild &options) {
 
   crypto::Aes::Key key;
 
+  if (options.sign_key().is_empty() == false) {
+    Keys keys_document(options.sign_key());
+
+    if (keys_document.is_existing() == false) {
+      API_RETURN_VALUE_ASSIGN_ERROR(
+        *this,
+        "sign key does not exist " | options.sign_key(),
+        EINVAL);
+    }
+
+    API_RETURN_VALUE_IF_ERROR(*this);
+
+    auto dsa = keys_document.get_digital_signature_algorithm(
+      Aes::Key(Aes::Key::Construct()
+                 .set_key(options.sign_key_password())
+                 .set_initialization_vector(keys_document.get_iv())));
+
+    const auto list = build.build_image_list();
+
+    build.sign(dsa);
+
+    printer::Printer::Object po(printer(), "signatureInfo");
+    printer()
+      .key("keyId", keys_document.get_document_id())
+      .key("publicKey", keys_document.get_public_key());
+
+    auto show_section = [&](const char *name, const Data &data) {
+      printer::Printer::Object po(printer(), name);
+      const ViewFile view_file(data);
+
+      const auto signature_info = Dsa::get_signature_info(view_file.seek(0));
+      const auto is_verified
+        = Dsa::verify(view_file.seek(0), keys_document.get_dsa_public_key());
+
+      printer()
+        .key("dataSize", NumberString(data.size()))
+        .key("hash", View(signature_info.hash()).to_string<GeneralString>())
+        .key("signature", signature_info.signature().to_string())
+        .key_bool("isVerified", is_verified);
+    };
+
+    for (const auto &image_info : list) {
+      printer::Printer::Object po(printer(), image_info.get_name());
+      {
+        const auto data = image_info.get_image_data();
+        show_section("text/data", data);
+      }
+
+      const auto section_list = image_info.get_section_list();
+      for (const auto &section : section_list) {
+        const auto data = section.get_image_data();
+        show_section(section.key().cstring(), data);
+      }
+    }
+
+    API_RETURN_VALUE_IF_ERROR(*this);
+  }
+
   CLOUD_PRINTER_TRACE("Creating and saving the build to the cloud");
   build.set_readme(get_readme())
     .set_description(options.change_description())
@@ -141,7 +202,7 @@ Project &Project::save_build(const SaveBuild &options) {
 
   {
     // readme may not be present so ignore the error
-    api::ErrorGuard error_guard;
+    api::ErrorScope es;
     remove_readme();
   }
 

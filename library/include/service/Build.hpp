@@ -8,6 +8,7 @@
 #include <sos/Link.hpp>
 #include <var/Base64.hpp>
 #include <fs/DataFile.hpp>
+#include <fs/ViewFile.hpp>
 
 #include "Document.hpp"
 
@@ -42,6 +43,7 @@ public:
 
     JSON_ACCESS_STRING(SectionImageInfo, image);
     JSON_ACCESS_INTEGER(SectionImageInfo, padding);
+    JSON_ACCESS_INTEGER(SectionImageInfo, size);
     JSON_ACCESS_BOOL(SectionImageInfo, signed);
 
     var::Data get_image_data() const {
@@ -53,9 +55,16 @@ public:
       if( is_signed() ){
         return *this;
       }
-      set_image_data(sign_data(get_image_data(), dsa));
+      const auto signed_data = sign_data(get_image_data(), dsa);
+      set_image_data(signed_data);
+      set_size(signed_data.size());
       set_signed(true);
       return *this;
+    }
+
+    crypto::Dsa::Signature get_signature() const {
+      auto data = get_image_data();
+      return crypto::Dsa::get_signature(fs::ViewFile(data));
     }
 
     SectionImageInfo &set_image_data(var::View image_view) {
@@ -94,13 +103,20 @@ public:
       if( is_signed() ){
         return *this;
       }
-      set_image_data(sign_data(get_image_data(), dsa));
+      const auto signed_data = sign_data(get_image_data(), dsa);
+      set_image_data(signed_data);
+      set_size(signed_data.size());
       set_signed(true);
       auto local_section_list = section_list();
       for(auto & section: local_section_list){
         section.sign(dsa);
       }
       return *this;
+    }
+
+    crypto::Dsa::Signature get_signature() const {
+      auto data = get_image_data();
+      return crypto::Dsa::get_signature(fs::ViewFile(data));
     }
 
     ImageInfo &set_image_data(const var::View &image_view) {
@@ -153,6 +169,7 @@ public:
   JSON_ACCESS_STRING(Build, readme);
   JSON_ACCESS_STRING(Build, description);
   JSON_ACCESS_STRING(Build, type);
+  JSON_ACCESS_STRING(Build, signature);
   JSON_ACCESS_STRING_WITH_KEY(Build, projectId, project_id);
   JSON_ACCESS_ARRAY_WITH_KEY(Build, ImageInfo, buildList, build_image_list);
   JSON_ACCESS_STRING_ARRAY_WITH_KEY(
@@ -165,9 +182,14 @@ public:
   JSON_ACCESS_STRING(Build, iv);
 
   Build &remove_build_image_data() {
-    var::Vector<ImageInfo> build_list = build_image_list();
+    auto build_list = build_image_list();
     for (ImageInfo &image_info : build_list) {
       image_info.set_image("<base64>");
+
+      auto section_list = image_info.section_list();
+      for(auto & section_info: section_list){
+        section_info.set_image("<base64>");
+      }
     }
     set_image_included(false);
     return *this;
