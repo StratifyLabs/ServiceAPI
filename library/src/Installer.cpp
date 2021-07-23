@@ -286,32 +286,6 @@ void Installer::install_build(Build &build, const Install &options) {
   API_RETURN_IF_ERROR();
   CLOUD_PRINTER_TRACE("Installing build type " | build.get_type());
 
-  if (options.sign_key_id().is_empty() == false) {
-
-    if (options.sign_key_password().is_empty()) {
-      API_RETURN_ASSIGN_ERROR("cannot use keys id without a password", EINVAL);
-    }
-
-    if (options.sign_key_password().length() != 64) {
-      API_RETURN_ASSIGN_ERROR(
-        "sign key password must be 64 characters long",
-        EINVAL);
-    }
-
-    Keys keys_document(options.sign_key_id());
-
-    const auto dsa = keys_document.get_digital_signature_algorithm(
-      Aes::Key(Aes::Key::Construct()
-                 .set_key(options.sign_key_password())
-                 .set_initialization_vector(keys_document.get_iv())));
-    API_RETURN_IF_ERROR();
-
-    // sign the build if it isn't signed yet
-    build.sign(dsa);
-
-    API_RETURN_IF_ERROR();
-  }
-
   if (build.decode_build_type() == Build::Type::application) {
     CLOUD_PRINTER_TRACE("installing application build");
     install_application_build(build, options);
@@ -431,6 +405,32 @@ void Installer::install_os_build(Build &build, const Install &options) {
       secret_key.get_substring_with_length(secret_key.length() / 2));
   }
 
+  if (options.sign_key_id().is_empty() == false) {
+
+    if (options.sign_key_password().is_empty()) {
+      API_RETURN_ASSIGN_ERROR("cannot use keys id without a password", EINVAL);
+    }
+
+    if (options.sign_key_password().length() != 64) {
+      API_RETURN_ASSIGN_ERROR(
+        "sign key password must be 64 characters long",
+        EINVAL);
+    }
+
+    Keys keys_document(options.sign_key_id());
+
+    const auto dsa = keys_document.get_digital_signature_algorithm(
+      Aes::Key(Aes::Key::Construct()
+                 .set_key(options.sign_key_password())
+                 .set_initialization_vector(keys_document.get_iv())));
+    API_RETURN_IF_ERROR();
+
+    // sign the build if it isn't signed yet
+    build.sign(dsa);
+
+    API_RETURN_IF_ERROR();
+  }
+
   if (fs::Path::suffix(options.destination()) == "json") {
     Link::Path link_path(options.destination(), connection()->driver());
 
@@ -495,19 +495,75 @@ void Installer::install_application_image(
   const fs::FileObject &image,
   const Install &options) {
 
+  CLOUD_PRINTER_TRACE("check flash available");
+  const bool is_flash_available
+    = !options.destination().is_empty()
+        ? false
+        : (
+          options.is_flash()
+            ? Appfs(connection()->driver()).is_flash_available()
+            : false);
+
+  Appfs::FileAttributes attributes(image.seek(0));
+
+  const auto version = options.version().is_empty()
+                         ? sys::Version::from_u16(attributes.version())
+                         : sys::Version(options.version());
+
+  attributes.set_name(project_name() + options.suffix())
+    .set_id(project_id())
+    .set_startup(options.is_startup())
+    .set_flash(is_flash_available)
+    .set_code_external(options.is_external_code())
+    .set_data_external(options.is_external_data())
+    .set_code_tightly_coupled(options.is_tightly_coupled_code())
+    .set_data_tightly_coupled(options.is_tightly_coupled_data())
+    .set_ram_size(options.ram_size())
+    .set_authenticated(options.is_authenticated())
+    .set_access_mode(options.access_mode())
+    .set_version(version.to_bcd16())
+    .apply(image);
+
+  DataFile image_copy = DataFile(OpenMode::append_read_write()).write(image.seek(0)).move();
+
+  if (options.sign_key_id().is_empty() == false) {
+
+    if (options.sign_key_password().is_empty()) {
+      API_RETURN_ASSIGN_ERROR("cannot use keys id without a password", EINVAL);
+    }
+
+    if (options.sign_key_password().length() != 64) {
+      API_RETURN_ASSIGN_ERROR(
+        "sign key password must be 64 characters long",
+        EINVAL);
+    }
+
+    Keys keys_document(options.sign_key_id());
+
+    const auto dsa = keys_document.get_digital_signature_algorithm(
+      Aes::Key(Aes::Key::Construct()
+                 .set_key(options.sign_key_password())
+                 .set_initialization_vector(keys_document.get_iv())));
+    API_RETURN_IF_ERROR();
+
+
+    // sign the build if it isn't signed yet
+    dsa.sign(image_copy.seek(0));
+
+    const auto signature_info = Dsa::get_signature_info(image_copy.seek(0));
+    printer().object("signatureInfo", signature_info);
+
+    API_RETURN_IF_ERROR();
+  }
+
   if (!options.destination().is_empty()) {
     CLOUD_PRINTER_TRACE("save locally");
     save_image_locally(
       Build(Build::Construct()),
-      image,
+      image_copy.seek(0),
       Install(options).set_application());
     return;
   }
-
-  CLOUD_PRINTER_TRACE("check flash available");
-  const bool is_flash_available
-    = options.is_flash() ? Appfs(connection()->driver()).is_flash_available()
-                         : false;
 
   API_RETURN_IF_ERROR();
 
@@ -538,26 +594,6 @@ void Installer::install_application_image(
     clean_application();
   }
 
-  Appfs::FileAttributes attributes(image.seek(0));
-
-  const auto version = options.version().is_empty()
-                         ? sys::Version::from_u16(attributes.version())
-                         : sys::Version(options.version());
-
-  attributes.set_name(project_name() + options.suffix())
-    .set_id(project_id())
-    .set_startup(options.is_startup())
-    .set_flash(is_flash_available)
-    .set_code_external(options.is_external_code())
-    .set_data_external(options.is_external_data())
-    .set_code_tightly_coupled(options.is_tightly_coupled_code())
-    .set_data_tightly_coupled(options.is_tightly_coupled_data())
-    .set_ram_size(options.ram_size())
-    .set_authenticated(options.is_authenticated())
-    .set_access_mode(options.access_mode())
-    .set_version(version.to_bcd16())
-    .apply(image);
-
   printer().object("appfsAttributes", attributes);
 
   if (connection()->is_connected() == false) {
@@ -575,7 +611,7 @@ void Installer::install_application_image(
         options.destination().is_empty() ? "/app" : options.destination())
       .set_name(attributes.name()),
     connection()->driver())
-    .append(image.seek(0), printer().progress_callback());
+    .append(image_copy.seek(0), printer().progress_callback());
   transfer_timer.stop();
   printer().set_progress_key("progress");
 
