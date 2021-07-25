@@ -158,9 +158,9 @@ Project &Project::save_build(const SaveBuild &options) {
       printer::Printer::Object po(printer(), name);
       const ViewFile view_file(data);
 
-      const auto signature_info = Dsa::get_signature_info(view_file.seek(0));
+      const auto signature_info = sos::Auth::get_signature_info(view_file.seek(0));
       const auto is_verified
-        = Dsa::verify(view_file.seek(0), keys_document.get_dsa_public_key());
+        = sos::Auth::verify(view_file.seek(0), keys_document.get_dsa_public_key());
 
       printer()
         .key("dataSize", NumberString(data.size()))

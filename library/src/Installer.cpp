@@ -548,9 +548,9 @@ void Installer::install_application_image(
 
 
     // sign the build if it isn't signed yet
-    dsa.sign(image_copy.seek(0));
+    sos::Auth::sign(image_copy.seek(0), dsa);
 
-    const auto signature_info = Dsa::get_signature_info(image_copy.seek(0));
+    const auto signature_info = sos::Auth::get_signature_info(image_copy.seek(0));
     printer().object("signatureInfo", signature_info);
 
     API_RETURN_IF_ERROR();
@@ -662,8 +662,8 @@ void Installer::install_os_image(
     if (is_signature_required) {
       // verify the signature is valid before attempting to install
       auto public_key = connection()->get_public_key();
-      const auto signature_info = Dsa::get_signature_info(image.seek(0));
-      const auto is_verified = Dsa::verify(image.seek(0), Dsa::Key(public_key));
+      const auto signature_info = sos::Auth::get_signature_info(image.seek(0));
+      const auto is_verified = sos::Auth::verify(image.seek(0), Dsa::PublicKey(public_key));
 
       printer()
         .key("publicKey", View(public_key).to_string<GeneralString>())
@@ -781,26 +781,9 @@ void Installer::save_image_locally(
     API_RETURN_ASSIGN_ERROR(PathString(parent_path).cstring(), ENOENT);
   }
 
-  const auto append_hash =
-    [&](Data &&image_data, const StringView name, bool is_append_hash) -> Data {
-    if (is_append_hash == false) {
-      return std::move(image_data);
-    } else {
-      DataFile hashed = DataFile()
-                          .reserve(image_data.size())
-                          .write(ViewFile(image_data))
-                          .move();
-
-      crypto::Sha256::Hash hash = crypto::Sha256::append_aligned_hash(hashed);
-      printer().key(name & "Hash", View(hash).to_string<KeyString>());
-
-      return hashed.data();
-    }
-  };
-
   Printer::Object sections_object(printer(), "sections");
   {
-    Printer::Object sections_object(printer(), ".text");
+    Printer::Object text_object(printer(), ".text");
     printer()
       .key("path", link_path.prefix() | destination)
       .key("size", NumberString(image.size()));

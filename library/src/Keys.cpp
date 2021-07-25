@@ -32,7 +32,7 @@ crypto::DigitalSignatureAlgorithm
 Keys::get_digital_signature_algorithm(const crypto::Aes::Key &key) const {
 
   auto key_pair = DigitalSignatureAlgorithm::KeyPair()
-                    .set_public_key(DigitalSignatureAlgorithm::Key(get_public_key()));
+                    .set_public_key(DigitalSignatureAlgorithm::PublicKey(get_public_key()));
 
   if( key.is_null() == false ){
     // need to decrypt the private key
@@ -45,7 +45,7 @@ Keys::get_digital_signature_algorithm(const crypto::Aes::Key &key) const {
           .set_key256(key.get_key256())
           .decrypt_cbc(private_key_cipher).resize(get_private_key_size());
 
-    key_pair.set_private_key(DigitalSignatureAlgorithm::Key(
+    key_pair.set_private_key(DigitalSignatureAlgorithm::PrivateKey(
         View(private_key_plain).to_string<GeneralString>()));
   }
 

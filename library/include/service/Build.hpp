@@ -3,12 +3,13 @@
 #ifndef SERVICE_API_SERVICE_BUILD_HPP
 #define SERVICE_API_SERVICE_BUILD_HPP
 
-#include <crypto/Sha256.hpp>
 #include <crypto/Ecc.hpp>
-#include <sos/Link.hpp>
-#include <var/Base64.hpp>
+#include <crypto/Sha256.hpp>
 #include <fs/DataFile.hpp>
 #include <fs/ViewFile.hpp>
+#include <sos/Auth.hpp>
+#include <sos/Link.hpp>
+#include <var/Base64.hpp>
 
 #include "Document.hpp"
 
@@ -16,10 +17,10 @@ namespace service {
 
 class Build : public DocumentAccess<Build> {
 
-  static var::Data sign_data(const var::Data & data, const crypto::Dsa & dsa){
+  static var::Data sign_data(const var::Data &data, const crypto::Dsa &dsa) {
     fs::DataFile data_file;
     data_file.data() = data;
-    dsa.sign(data_file);
+    sos::Auth::sign(data_file, dsa);
     return data_file.data();
   }
 
@@ -47,12 +48,11 @@ public:
     JSON_ACCESS_BOOL(SectionImageInfo, signed);
 
     var::Data get_image_data() const {
-      return var::Base64()
-        .decode(var::StringView(get_image_cstring()));
+      return var::Base64().decode(var::StringView(get_image_cstring()));
     }
 
-    SectionImageInfo &sign(const crypto::Dsa & dsa){
-      if( is_signed() ){
+    SectionImageInfo &sign(const crypto::Dsa &dsa) {
+      if (is_signed()) {
         return *this;
       }
       const auto signed_data = sign_data(get_image_data(), dsa);
@@ -64,7 +64,7 @@ public:
 
     crypto::Dsa::Signature get_signature() const {
       auto data = get_image_data();
-      return crypto::Dsa::get_signature(fs::ViewFile(data));
+      return sos::Auth::get_signature(fs::ViewFile(data));
     }
 
     SectionImageInfo &set_image_data(var::View image_view) {
@@ -99,8 +99,8 @@ public:
       return var::Base64().decode(get_image());
     }
 
-    ImageInfo &sign(const crypto::Dsa & dsa){
-      if( is_signed() ){
+    ImageInfo &sign(const crypto::Dsa &dsa) {
+      if (is_signed()) {
         return *this;
       }
       const auto signed_data = sign_data(get_image_data(), dsa);
@@ -108,7 +108,7 @@ public:
       set_size(signed_data.size());
       set_signed(true);
       auto local_section_list = section_list();
-      for(auto & section: local_section_list){
+      for (auto &section : local_section_list) {
         section.sign(dsa);
       }
       return *this;
@@ -116,7 +116,7 @@ public:
 
     crypto::Dsa::Signature get_signature() const {
       auto data = get_image_data();
-      return crypto::Dsa::get_signature(fs::ViewFile(data));
+      return sos::Auth::get_signature(fs::ViewFile(data));
     }
 
     ImageInfo &set_image_data(const var::View &image_view) {
@@ -187,7 +187,7 @@ public:
       image_info.set_image("<base64>");
 
       auto section_list = image_info.section_list();
-      for(auto & section_info: section_list){
+      for (auto &section_info : section_list) {
         section_info.set_image("<base64>");
       }
     }
@@ -230,9 +230,7 @@ public:
     const var::StringView build_name,
     const var::View public_key);
 
-  Build &insert_public_key(
-    ImageInfo & image_info,
-    const var::View public_key);
+  Build &insert_public_key(ImageInfo &image_info, const var::View public_key);
 
   bool is_build_image_included() const {
     // buildIncludesImage is a legacy support thing
@@ -241,7 +239,7 @@ public:
   }
 
   Build &import_url(const var::StringView url);
-  //int download(const BuildOptions &options);
+  // int download(const BuildOptions &options);
 
   var::Data get_image(const var::StringView name) const;
   Build &set_image(const var::StringView name, const var::Data &image);
@@ -261,7 +259,7 @@ public:
     return *this;
   }
 
-  Build & sign(const crypto::Dsa& dsa);
+  Build &sign(const crypto::Dsa &dsa);
 
   var::StringView application_architecture() const {
     if (decode_build_type() == Type::application) {
@@ -284,7 +282,7 @@ private:
 
   var::PathString
   get_build_file_path(const var::StringView path, const var::StringView build);
-  
+
   class ImportElfFile {
     API_AC(ImportElfFile, json::JsonObject, project_settings);
     API_AC(ImportElfFile, var::StringView, path);
@@ -298,9 +296,8 @@ private:
 
   static var::StringView get_arch(const var::StringView name);
 
-
   bool insert_pure_code_secret_key(
-    var::Data & image_data,
+    var::Data &image_data,
     const var::View secret_key);
 };
 
