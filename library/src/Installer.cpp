@@ -451,6 +451,12 @@ void Installer::install_os_build(Build &build, const Install &options) {
   DataFile image;
   image.data() = build.get_image(options.build_name());
 
+  const auto signature_info = sos::Auth::get_signature_info(image);
+  if( signature_info.signature().is_valid() ){
+    printer().object("sigantureInfo", signature_info);
+    printf("image size is %ld\n", image.size());
+  }
+
   if (options.is_append_hash()) {
     const crypto::Sha256::Hash hash
       = crypto::Sha256::append_aligned_hash(image);
@@ -465,7 +471,7 @@ void Installer::install_os_build(Build &build, const Install &options) {
 
   install_os_image(
     build,
-    image,
+    image.seek(0),
     Install(options).set_reconnect(
       options.is_reconnect() || options.is_synchronize_thing()));
 
@@ -524,7 +530,8 @@ void Installer::install_application_image(
     .set_version(version.to_bcd16())
     .apply(image);
 
-  DataFile image_copy = DataFile(OpenMode::append_read_write()).write(image.seek(0)).move();
+  DataFile image_copy
+    = DataFile(OpenMode::append_read_write()).write(image.seek(0)).move();
 
   if (options.sign_key_id().is_empty() == false) {
 
@@ -546,11 +553,11 @@ void Installer::install_application_image(
                  .set_initialization_vector(keys_document.get_iv())));
     API_RETURN_IF_ERROR();
 
-
     // sign the build if it isn't signed yet
     sos::Auth::sign(image_copy.seek(0), dsa);
 
-    const auto signature_info = sos::Auth::get_signature_info(image_copy.seek(0));
+    const auto signature_info
+      = sos::Auth::get_signature_info(image_copy.seek(0));
     printer().object("signatureInfo", signature_info);
 
     API_RETURN_IF_ERROR();
@@ -646,13 +653,28 @@ void Installer::install_os_image(
   {
     Printer::Object po(printer(), "bootloader");
     if (!connection()->is_bootloader()) {
-      CLOUD_PRINTER_TRACE("invoke the bootloader");
-      // bootloader must be invoked
-      connection()->reset_bootloader();
-      chrono::wait(options.delay());
-      // now reconnect to the device
 
-      reconnect(options);
+      if (options.flash_device().is_empty() == false) {
+
+        if (
+          Link::FileSystem(connection()->driver())
+            .exists(options.flash_device())
+          == false) {
+          API_RETURN_ASSIGN_ERROR(
+            "`" | options.flash_device() | "` was specified to use for the OS installed, but was not found on the target",
+            EINVAL);
+        }
+
+      } else {
+
+        CLOUD_PRINTER_TRACE("invoke the bootloader");
+        // bootloader must be invoked
+        connection()->reset_bootloader();
+        chrono::wait(options.delay());
+        // now reconnect to the device
+
+        reconnect(options);
+      }
     } else {
       CLOUD_PRINTER_TRACE("connected to bootloader");
     }
@@ -663,7 +685,8 @@ void Installer::install_os_image(
       // verify the signature is valid before attempting to install
       auto public_key = connection()->get_public_key();
       const auto signature_info = sos::Auth::get_signature_info(image.seek(0));
-      const auto is_verified = sos::Auth::verify(image.seek(0), Dsa::PublicKey(public_key));
+      const auto is_verified
+        = sos::Auth::verify(image.seek(0), Dsa::PublicKey(public_key));
 
       printer()
         .key("publicKey", View(public_key).to_string<GeneralString>())
@@ -690,6 +713,7 @@ void Installer::install_os_image(
     connection()->update_os(
       Link::UpdateOs()
         .set_image(&(image.seek(0)))
+        .set_flash_path(options.flash_device())
         .set_bootloader_retry_count(options.retry_reconnect_count())
         .set_printer(&printer())
         .set_verify(options.is_verify()));
