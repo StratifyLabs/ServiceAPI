@@ -454,7 +454,6 @@ void Installer::install_os_build(Build &build, const Install &options) {
   const auto signature_info = sos::Auth::get_signature_info(image);
   if( signature_info.signature().is_valid() ){
     printer().object("sigantureInfo", signature_info);
-    printf("image size is %ld\n", image.size());
   }
 
   if (options.is_append_hash()) {
@@ -653,20 +652,6 @@ void Installer::install_os_image(
   {
     Printer::Object po(printer(), "bootloader");
     if (!connection()->is_bootloader()) {
-
-      if (options.flash_device().is_empty() == false) {
-
-        if (
-          Link::FileSystem(connection()->driver())
-            .exists(options.flash_device())
-          == false) {
-          API_RETURN_ASSIGN_ERROR(
-            "`" | options.flash_device() | "` was specified to use for the OS installed, but was not found on the target",
-            EINVAL);
-        }
-
-      } else {
-
         CLOUD_PRINTER_TRACE("invoke the bootloader");
         // bootloader must be invoked
         connection()->reset_bootloader();
@@ -674,7 +659,7 @@ void Installer::install_os_image(
         // now reconnect to the device
 
         reconnect(options);
-      }
+
     } else {
       CLOUD_PRINTER_TRACE("connected to bootloader");
     }
