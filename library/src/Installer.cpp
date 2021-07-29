@@ -453,7 +453,18 @@ void Installer::install_os_build(Build &build, const Install &options) {
 
   const auto signature_info = sos::Auth::get_signature_info(image);
   if( signature_info.signature().is_valid() ){
-    printer().object("sigantureInfo", signature_info);
+    printer::Printer::Object si_object(printer(), "signatureInfo");
+    printer().object("text", signature_info);
+    const auto section_list = build.build_image_info(options.build_name()).get_section_list();
+    for(const auto & section: section_list){
+      DataFile section_image;
+      section_image.data() = section.get_image_data();
+      const auto section_signature_info = sos::Auth::get_signature_info(section_image);
+      if( section_signature_info.signature().is_valid() ){
+        printer().object(section.key(), section_signature_info);
+      }
+    }
+
   }
 
   if (options.is_append_hash()) {
