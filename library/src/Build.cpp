@@ -55,7 +55,6 @@ Build::Build(const Construct &options)
     Aes::Key::Construct().set_key(get_key()).set_initialization_vector(
       get_iv()));
 
-
   auto download_image = [&](StringView name, size_t size) -> var::Data{
     DataFile image;
     cloud_service().storage().get_object(
@@ -85,6 +84,7 @@ Build::Build(const Construct &options)
     API_ASSERT(options.project_id().is_empty() == false);
     API_ASSERT(options.build_name().is_empty() == false);
 
+    printer::Printer::Object build_object(printer(), options.build_name());
     ImageInfo image_info = build_image_info(options.build_name());
     auto data = download_image(options.build_name(), image_info.get_size());
     image_info.set_image_data(data);
@@ -92,8 +92,9 @@ Build::Build(const Construct &options)
     auto section_list = image_info.section_list();
     for(auto & section: section_list){
       if( section.get_image() == "<base64>"){
-        auto data = download_image(options.build_name() & "." & section.key(), section.get_size());
-        section.set_image_data(data);
+        printer::Printer::Object image_object(printer(), section.key());
+        auto section_data = download_image(options.build_name() & "." & section.key(), section.get_size());
+        section.set_image_data(section_data);
       }
     }
 

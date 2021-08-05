@@ -829,7 +829,7 @@ void Installer::save_image_locally(
       {
         const var::PathString section_destination
           = fs::Path::no_suffix(destination) & image_info.key() & ".bin";
-        Printer::Object sections_object(printer(), image_info.key());
+        Printer::Object image_object(printer(), image_info.key());
 
         DataFile data_file;
         data_file.data() = image_info.get_image_data();
