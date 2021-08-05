@@ -419,10 +419,16 @@ void Installer::install_os_build(Build &build, const Install &options) {
 
     Keys keys_document(options.sign_key_id());
 
-    const auto dsa = keys_document.get_digital_signature_algorithm(
-      Aes::Key(Aes::Key::Construct()
-                 .set_key(options.sign_key_password())
-                 .set_initialization_vector(keys_document.get_iv())));
+    Aes::Key aes_key(Aes::Key::Construct()
+                       .set_key(options.sign_key_password())
+                       .set_initialization_vector(keys_document.get_iv()));
+
+    if( aes_key.is_key_null() && !aes_key.is_iv_null() ){
+      API_RETURN_ASSIGN_ERROR("This key is encrypted and a password must be provided", EINVAL);
+    }
+
+    const auto dsa = keys_document.get_digital_signature_algorithm(aes_key);
+
     API_RETURN_IF_ERROR();
 
     // sign the build if it isn't signed yet
@@ -452,19 +458,20 @@ void Installer::install_os_build(Build &build, const Install &options) {
   image.data() = build.get_image(options.build_name());
 
   const auto signature_info = sos::Auth::get_signature_info(image);
-  if( signature_info.signature().is_valid() ){
+  if (signature_info.signature().is_valid()) {
     printer::Printer::Object si_object(printer(), "signatureInfo");
     printer().object("text", signature_info);
-    const auto section_list = build.build_image_info(options.build_name()).get_section_list();
-    for(const auto & section: section_list){
+    const auto section_list
+      = build.build_image_info(options.build_name()).get_section_list();
+    for (const auto &section : section_list) {
       DataFile section_image;
       section_image.data() = section.get_image_data();
-      const auto section_signature_info = sos::Auth::get_signature_info(section_image);
-      if( section_signature_info.signature().is_valid() ){
+      const auto section_signature_info
+        = sos::Auth::get_signature_info(section_image);
+      if (section_signature_info.signature().is_valid()) {
         printer().object(section.key(), section_signature_info);
       }
     }
-
   }
 
   if (options.is_append_hash()) {
@@ -663,13 +670,13 @@ void Installer::install_os_image(
   {
     Printer::Object po(printer(), "bootloader");
     if (!connection()->is_bootloader()) {
-        CLOUD_PRINTER_TRACE("invoke the bootloader");
-        // bootloader must be invoked
-        connection()->reset_bootloader();
-        chrono::wait(options.delay());
-        // now reconnect to the device
+      CLOUD_PRINTER_TRACE("invoke the bootloader");
+      // bootloader must be invoked
+      connection()->reset_bootloader();
+      chrono::wait(options.delay());
+      // now reconnect to the device
 
-        reconnect(options);
+      reconnect(options);
 
     } else {
       CLOUD_PRINTER_TRACE("connected to bootloader");
