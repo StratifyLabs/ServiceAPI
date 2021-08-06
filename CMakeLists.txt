@@ -19,6 +19,10 @@ set(LOCAL_NAME ServiceAPI)
 project(${LOCAL_NAME} CXX)
 include(CTest)
 
+option(SERVICE_API_IS_TEST "Enable Service API tests" OFF)
+
 add_subdirectory(library library)
-add_subdirectory(tests tests)
+if(SERVICE_API_IS_TEST)
+	add_subdirectory(tests tests)
+endif()
 
