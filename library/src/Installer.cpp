@@ -24,8 +24,12 @@ Installer &Installer::install(const Install &options) {
   if (connection()->is_connected_and_is_not_bootloader()) {
     set_architecture(connection()->info().architecture());
   } else {
+    if( options.architecture().is_empty() ){
+      API_RETURN_VALUE_ASSIGN_ERROR(*this, "Architecture must be specified manually", EINVAL);
+    }
     set_architecture(options.architecture());
   }
+
 
   const Vector<AppUpdate> app_update_list = options.is_update_apps()
                                               ? get_app_update_list(options)
@@ -77,6 +81,7 @@ void Installer::install_url(const Install &options) {
 
 void Installer::install_id(const Install &options) {
   API_RETURN_IF_ERROR();
+
   Project p(Project::Id(options.project_id()));
   set_project_name(p.get_name());
   set_project_id(p.get_document_id());

@@ -144,7 +144,7 @@ Project &Project::save_build(const SaveBuild &options) {
     //the boot builds need to be keyed with the public key
     for (auto image_info: list) {
       if( image_info.get_name().find("_boot_") != StringView::npos ){
-        printer::Printer::Object po(printer(), "addPublicKey" & image_info.get_name());
+        printer::Printer::Object po(printer(), "addPublicKey_" & image_info.get_name());
         build.insert_public_key(image_info, keys_document.get_dsa_public_key().data());
       }
     }

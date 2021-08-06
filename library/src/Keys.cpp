@@ -31,23 +31,21 @@ Keys::Keys(
 crypto::DigitalSignatureAlgorithm
 Keys::get_digital_signature_algorithm(const crypto::Aes::Key &key) const {
 
-  auto key_pair = DigitalSignatureAlgorithm::KeyPair()
-                    .set_public_key(get_dsa_public_key());
+  auto key_pair
+    = DigitalSignatureAlgorithm::KeyPair().set_public_key(get_dsa_public_key());
 
-  if( key.is_null() == false ){
-    // need to decrypt the private key
-    const auto private_key_cipher
-      = Data::from_string(get_private_key());
+  // need to decrypt the private key
+  const auto private_key_cipher = Data::from_string(get_private_key());
 
-    const auto private_key_plain
-      = Aes()
-          .set_initialization_vector(key.initialization_vector())
-          .set_key256(key.get_key256())
-          .decrypt_cbc(private_key_cipher).resize(get_private_key_size());
+  const auto private_key_plain
+    = Aes()
+        .set_initialization_vector(key.initialization_vector())
+        .set_key256(key.get_key256())
+        .decrypt_cbc(private_key_cipher)
+        .resize(get_private_key_size());
 
-    key_pair.set_private_key(DigitalSignatureAlgorithm::PrivateKey(
-        View(private_key_plain).to_string<GeneralString>()));
-  }
+  key_pair.set_private_key(DigitalSignatureAlgorithm::PrivateKey(
+    View(private_key_plain).to_string<GeneralString>()));
 
   return DigitalSignatureAlgorithm(key_pair);
 }
