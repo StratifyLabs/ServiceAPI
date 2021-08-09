@@ -73,6 +73,7 @@ public:
   JSON_ACCESS_STRING(Project, github);
   JSON_ACCESS_STRING(Project, description);
   JSON_ACCESS_STRING_WITH_KEY(Project, hardwareId, hardware_id);
+  JSON_ACCESS_STRING_WITH_KEY(Project, signKeyId, sign_key_id);
   JSON_ACCESS_STRING(Project, readme);
   JSON_ACCESS_STRING_WITH_KEY(Project, ramSize, ram_size);
   JSON_ACCESS_OBJECT_LIST_WITH_KEY(Project, BuildItem, buildList, build_list);
