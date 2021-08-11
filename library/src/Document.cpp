@@ -37,7 +37,18 @@ Document::list(var::StringView path, var::StringView mask) {
 
 Document::Document(const var::StringView path, const Id &id)
   : m_path(path), m_id(id) {
-  if (id.is_empty() == false) {
+
+  if (id.string_view().find(".json") != StringView::npos) {
+    if (FileSystem().exists(id) == true) {
+      const auto info = FileSystem().get_info(id);
+      if (info.is_file()) {
+        interface_import_file(File(id));
+        CLOUD_PRINTER_TRACE("loaded file from " | id);
+      }
+    } else {
+      m_is_imported = false;
+    }
+  } else if (id.is_empty() == false) {
     api::ErrorScope es;
     to_object() = cloud_service().store().get_document(Path(path) / id);
     m_is_existing = is_success();
@@ -54,11 +65,13 @@ void Document::update_is_existing() {
     CLOUD_PRINTER_TRACE("checking if " | get_document_id() | " exists");
     m_is_imported = false;
     if (get_document_id().is_empty() == false) {
-      CLOUD_PRINTER_TRACE("Checking to see if " | get_document_id() | " exists in the cloud");
+      CLOUD_PRINTER_TRACE(
+        "Checking to see if " | get_document_id() | " exists in the cloud");
       api::ErrorGuard error_guard;
       cloud_service().store().get_document(get_path_with_id());
       m_is_existing = is_success();
-      CLOUD_PRINTER_TRACE(get_document_id() | " exists? " | (m_is_existing ? "true" : "false"));
+      CLOUD_PRINTER_TRACE(
+        get_document_id() | " exists? " | (m_is_existing ? "true" : "false"));
     }
   }
 }
@@ -116,8 +129,9 @@ void Document::interface_save() {
       m_id = result;
     } else {
       CLOUD_PRINTER_TRACE("there was an error creating the document");
-      JsonObject error
-        = JsonDocument().from_string(cloud_service().store().error_string()).to_object();
+      JsonObject error = JsonDocument()
+                           .from_string(cloud_service().store().error_string())
+                           .to_object();
       if (
         error.at("error").to_object().at("status").to_string()
         == "ALREADY_EXISTS") {
@@ -133,15 +147,20 @@ void Document::interface_save() {
   CLOUD_PRINTER_TRACE("patching document with id " | id());
   cloud_service().store().document_update_mask_fields().clear();
   set_document_id(id());
-  cloud_service().store().patch_document(get_path_with_id().string_view(), to_object());
+  cloud_service().store().patch_document(
+    get_path_with_id().string_view(),
+    to_object());
   return;
 }
 
 void Document::interface_import_file(const fs::File &file) {
   JsonDocument json_document;
   to_object() = json_document.load(file);
-  if( is_error() ){
-      printer().object("json load error", json_document.error(), printer::Printer::Level::trace);
+  if (is_error()) {
+    printer().object(
+      "json load error",
+      json_document.error(),
+      printer::Printer::Level::trace);
   }
   m_id = get_document_id();
   convert_tags_to_list(); // tags -> tagList
@@ -168,7 +187,7 @@ Document &Document::import_binary_file_to_base64(
 }
 
 void Document::convert_tags_to_list() {
-    api::ErrorGuard error_guard;
+  api::ErrorGuard error_guard;
   StringView tags(to_object().at("tags").to_string_view());
   if (tags.is_empty() == false) {
     set_tag_list(tags.split(","));

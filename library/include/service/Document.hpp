@@ -86,6 +86,7 @@ public:
   const Path &path() const { return m_path; }
 
   bool is_existing() const { return m_is_existing; }
+  bool is_imported() const { return m_is_imported; }
 
 protected:
   Document &

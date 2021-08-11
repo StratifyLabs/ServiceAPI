@@ -123,7 +123,7 @@ Project &Project::save_build(const SaveBuild &options) {
   if (options.sign_key().is_empty() == false) {
     Keys keys_document(options.sign_key());
 
-    if (keys_document.is_existing() == false) {
+    if (keys_document.is_valid() == false) {
       API_RETURN_VALUE_ASSIGN_ERROR(
         *this,
         "sign key does not exist " | options.sign_key(),

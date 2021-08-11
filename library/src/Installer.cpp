@@ -24,12 +24,14 @@ Installer &Installer::install(const Install &options) {
   if (connection()->is_connected_and_is_not_bootloader()) {
     set_architecture(connection()->info().architecture());
   } else {
-    if( options.architecture().is_empty() ){
-      API_RETURN_VALUE_ASSIGN_ERROR(*this, "Architecture must be specified manually", EINVAL);
+    if (options.architecture().is_empty()) {
+      API_RETURN_VALUE_ASSIGN_ERROR(
+        *this,
+        "Architecture must be specified manually",
+        EINVAL);
     }
     set_architecture(options.architecture());
   }
-
 
   const Vector<AppUpdate> app_update_list = options.is_update_apps()
                                               ? get_app_update_list(options)
@@ -123,7 +125,9 @@ void Installer::install_binary(const Install &options) {
 
   if (options.is_application()) {
     CLOUD_PRINTER_TRACE("binary is an application");
-    Appfs::Info source_image_info = Appfs().get_info(options.binary_path());
+    API_PRINTF_TRACE_LINE();
+    const auto source_image_info = Appfs().get_info(options.binary_path());
+    API_PRINTF_TRACE_LINE();
 
     if (source_image_info.is_valid() == false) {
       API_RETURN_ASSIGN_ERROR("invalid image", EINVAL);
@@ -423,13 +427,20 @@ void Installer::install_os_build(Build &build, const Install &options) {
     }
 
     Keys keys_document(options.sign_key_id());
+    if (keys_document.is_valid() == false) {
+      API_RETURN_ASSIGN_ERROR(
+        "sign key id `" | options.sign_key_id() | "` is not valid",
+        EINVAL);
+    }
 
     Aes::Key aes_key(Aes::Key::Construct()
                        .set_key(options.sign_key_password())
                        .set_initialization_vector(keys_document.get_iv()));
 
-    if( aes_key.is_key_null() && !aes_key.is_iv_null() ){
-      API_RETURN_ASSIGN_ERROR("This key is encrypted and a password must be provided", EINVAL);
+    if (aes_key.is_key_null() && !aes_key.is_iv_null()) {
+      API_RETURN_ASSIGN_ERROR(
+        "This key is encrypted and a password must be provided",
+        EINVAL);
     }
 
     const auto dsa = keys_document.get_digital_signature_algorithm(aes_key);
@@ -555,6 +566,27 @@ void Installer::install_application_image(
   DataFile image_copy
     = DataFile(OpenMode::append_read_write()).write(image.seek(0)).move();
 
+  // check if a signature is required
+  CLOUD_PRINTER_TRACE("check if signature is required");
+  const auto is_signature_required
+    = !options.destination().is_empty()
+        ? false
+        : Appfs(Appfs::Construct(), connection()->driver()).is_signature_required();
+  API_RETURN_IF_ERROR();
+
+  if (options.sign_key_id().is_empty() && is_signature_required) {
+    CLOUD_PRINTER_TRACE("no key provided, but a signature is required");
+    const auto signature_info = sos::Auth::get_signature_info(image.seek(0));
+    if (signature_info.signature().is_valid() == false) {
+
+      API_RETURN_ASSIGN_ERROR(
+        "The device requires a signature on the image. No signature was "
+        "found "
+        "and no key was provided",
+        EINVAL);
+    }
+  }
+
   if (options.sign_key_id().is_empty() == false) {
 
     if (options.sign_key_password().is_empty()) {
@@ -568,7 +600,12 @@ void Installer::install_application_image(
     }
 
     Keys keys_document(options.sign_key_id());
-
+    if (keys_document.is_valid() == false) {
+      API_RETURN_ASSIGN_ERROR(
+        "sign key id `" | options.sign_key_id() | "` is not valid",
+        EINVAL);
+    }
+    API_RETURN_IF_ERROR();
     const auto dsa = keys_document.get_digital_signature_algorithm(
       Aes::Key(Aes::Key::Construct()
                  .set_key(options.sign_key_password())
