@@ -125,9 +125,7 @@ void Installer::install_binary(const Install &options) {
 
   if (options.is_application()) {
     CLOUD_PRINTER_TRACE("binary is an application");
-    API_PRINTF_TRACE_LINE();
     const auto source_image_info = Appfs().get_info(options.binary_path());
-    API_PRINTF_TRACE_LINE();
 
     if (source_image_info.is_valid() == false) {
       API_RETURN_ASSIGN_ERROR("invalid image", EINVAL);
