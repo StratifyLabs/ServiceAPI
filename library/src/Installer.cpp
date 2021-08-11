@@ -785,15 +785,15 @@ void Installer::reconnect(const Install &options) {
     options.delay().milliseconds()));
 
   printer().set_progress_key("reconnecting");
-  for (u32 i = 0; i < options.retry_reconnect_count(); i++) {
+	for (u32 i = 0; i < options.retry_reconnect_count(); i++) {
     connection()->reconnect(1, options.delay());
-    if (is_success() && connection()->is_connected()) {
-      break;
-    }
     API_RESET_ERROR();
     printer().update_progress(
       static_cast<int>(i),
       api::ProgressCallback::indeterminate_progress_total());
+		if (is_success() && connection()->is_connected()) {
+			break;
+		}
   }
 
   printer().update_progress(0, 0);
