@@ -53,6 +53,7 @@ public:
     API_ACCESS_BOOL(Install, force, false);
     API_ACCESS_BOOL(Install, kill, false);
     API_ACCESS_BOOL(Install, flash, false);
+    API_ACCESS_BOOL(Install, orphan, false);
     API_ACCESS_BOOL(Install, startup, false);
     API_ACCESS_BOOL(Install, authenticated, false);
     API_ACCESS_FUNDAMENTAL(Install, u32, ram_size, 0);

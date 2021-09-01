@@ -268,6 +268,11 @@ public:
     return var::StringView();
   }
 
+  static var::StringView get_architecture(const var::StringView name){
+    return get_arch(name);
+  }
+
+
 protected:
   void interface_save() override;
   void interface_remove() override;

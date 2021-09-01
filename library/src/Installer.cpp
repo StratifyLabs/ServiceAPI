@@ -24,13 +24,24 @@ Installer &Installer::install(const Install &options) {
   if (connection()->is_connected_and_is_not_bootloader()) {
     set_architecture(connection()->info().architecture());
   } else {
-    if (options.architecture().is_empty()) {
+
+    //if the architecture available in the name
+    const auto build_architecture = Build::get_architecture(options.build_name());
+
+    if( build_architecture.is_empty() == false ){
+      set_architecture(build_architecture);
+    }
+
+    if( options.architecture().is_empty() == false ){
+      set_architecture(options.architecture());
+    }
+
+    if (architecture().is_empty()) {
       API_RETURN_VALUE_ASSIGN_ERROR(
         *this,
         "Architecture must be specified manually",
         EINVAL);
     }
-    set_architecture(options.architecture());
   }
 
   const Vector<AppUpdate> app_update_list = options.is_update_apps()
@@ -543,14 +554,19 @@ void Installer::install_application_image(
 
   Appfs::FileAttributes attributes(image.seek(0));
 
+  const auto is_save_locally = !options.destination().is_empty();
+
   const auto version = options.version().is_empty()
                          ? sys::Version::from_u16(attributes.version())
                          : sys::Version(options.version());
 
-  attributes.set_name(project_name() + options.suffix())
+  const NameString name = is_save_locally ? fs::Path::name(options.destination()) : project_name();
+
+  attributes.set_name(name + options.suffix())
     .set_id(project_id())
     .set_startup(options.is_startup())
     .set_flash(is_flash_available)
+    .set_orphan(options.is_orphan())
     .set_code_external(options.is_external_code())
     .set_data_external(options.is_external_data())
     .set_code_tightly_coupled(options.is_tightly_coupled_code())
@@ -559,6 +575,7 @@ void Installer::install_application_image(
     .set_authenticated(options.is_authenticated())
     .set_access_mode(options.access_mode())
     .set_version(version.to_bcd16())
+    .set_access_mode(0555)
     .apply(image);
 
   DataFile image_copy
@@ -620,7 +637,7 @@ void Installer::install_application_image(
     API_RETURN_IF_ERROR();
   }
 
-  if (!options.destination().is_empty()) {
+  if (is_save_locally) {
     CLOUD_PRINTER_TRACE("save locally");
     save_image_locally(
       Build(Build::Construct()),
