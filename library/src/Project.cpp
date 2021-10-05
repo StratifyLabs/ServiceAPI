@@ -52,7 +52,7 @@ Project &Project::save_build(const SaveBuild &options) {
   }
 
   if ((permissions == "private") && get_team_id().is_empty()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "team id must be provided when permissions are `private`", EINVAL);
     return *this;
   }
 
@@ -87,7 +87,12 @@ Project &Project::save_build(const SaveBuild &options) {
   }
 
   if (get_team_id() != existing_project.get_team_id()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EPERM);
+    API_RETURN_VALUE_ASSIGN_ERROR(
+      *this,
+      "local project team ID `" | get_team_id()
+        | "` does not match the cloud team id `"
+        | existing_project.get_team_id() | "`",
+      EINVAL);
     return *this;
   }
 
@@ -95,7 +100,7 @@ Project &Project::save_build(const SaveBuild &options) {
     existing_project.get_team_id().is_empty()
     && existing_project.get_user_id()
          != cloud_service().store().credentials().get_uid()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EPERM);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "project user id does not match current user", EPERM);
     return *this;
   }
 
@@ -141,11 +146,15 @@ Project &Project::save_build(const SaveBuild &options) {
 
     build.sign(dsa);
 
-    //the boot builds need to be keyed with the public key
-    for (auto image_info: list) {
-      if( image_info.get_name().find("_boot_") != StringView::npos ){
-        printer::Printer::Object po(printer(), "addPublicKey_" & image_info.get_name());
-        build.insert_public_key(image_info, keys_document.get_dsa_public_key().data());
+    // the boot builds need to be keyed with the public key
+    for (auto image_info : list) {
+      if (image_info.get_name().find("_boot_") != StringView::npos) {
+        printer::Printer::Object po(
+          printer(),
+          "addPublicKey_" & image_info.get_name());
+        build.insert_public_key(
+          image_info,
+          keys_document.get_dsa_public_key().data());
       }
     }
 
@@ -158,16 +167,17 @@ Project &Project::save_build(const SaveBuild &options) {
       printer::Printer::Object po(printer(), name);
       const ViewFile view_file(data);
 
-      const auto signature_info = sos::Auth::get_signature_info(view_file.seek(0));
-      const auto is_verified
-        = sos::Auth::verify(view_file.seek(0), keys_document.get_dsa_public_key());
+      const auto signature_info
+        = sos::Auth::get_signature_info(view_file.seek(0));
+      const auto is_verified = sos::Auth::verify(
+        view_file.seek(0),
+        keys_document.get_dsa_public_key());
 
       printer()
         .key("dataSize", NumberString(data.size()))
         .key("hash", View(signature_info.hash()).to_string<GeneralString>())
         .key("signature", signature_info.signature().to_string())
         .key_bool("isVerified", is_verified);
-
     };
 
     for (const auto &image_info : list) {

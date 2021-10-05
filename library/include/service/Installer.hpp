@@ -20,6 +20,7 @@ public:
     API_ACCESS_COMPOUND(Install, var::StringView, team_id);
     API_ACCESS_COMPOUND(Install, var::StringView, public_key_id);
     API_ACCESS_COMPOUND(Install, var::StringView, sign_key_id);
+    API_ACCESS_COMPOUND(Install, var::StringView, default_sign_key_id);
     API_ACCESS_COMPOUND(Install, var::StringView, sign_key_password);
     API_ACCESS_COMPOUND(Install, var::StringView, url);
     API_ACCESS_COMPOUND(Install, var::StringView, flash_device);

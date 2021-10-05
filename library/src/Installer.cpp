@@ -25,14 +25,15 @@ Installer &Installer::install(const Install &options) {
     set_architecture(connection()->info().architecture());
   } else {
 
-    //if the architecture available in the name
-    const auto build_architecture = Build::get_architecture(options.build_name());
+    // if the architecture available in the name
+    const auto build_architecture
+      = Build::get_architecture(options.build_name());
 
-    if( build_architecture.is_empty() == false ){
+    if (build_architecture.is_empty() == false) {
       set_architecture(build_architecture);
     }
 
-    if( options.architecture().is_empty() == false ){
+    if (options.architecture().is_empty() == false) {
       set_architecture(options.architecture());
     }
 
@@ -423,7 +424,9 @@ void Installer::install_os_build(Build &build, const Install &options) {
       secret_key.get_substring_with_length(secret_key.length() / 2));
   }
 
-  if (options.sign_key_id().is_empty() == false) {
+  if (
+    options.sign_key_id().is_empty() == false
+    || options.default_sign_key_id().is_empty() == false) {
 
     if (options.sign_key_password().is_empty()) {
       API_RETURN_ASSIGN_ERROR("cannot use keys id without a password", EINVAL);
@@ -435,10 +438,14 @@ void Installer::install_os_build(Build &build, const Install &options) {
         EINVAL);
     }
 
-    Keys keys_document(options.sign_key_id());
+    const auto effective_sign_key_id = options.sign_key_id().is_empty()
+                                         ? options.default_sign_key_id()
+                                         : options.sign_key_id();
+
+    Keys keys_document(effective_sign_key_id);
     if (keys_document.is_valid() == false) {
       API_RETURN_ASSIGN_ERROR(
-        "sign key id `" | options.sign_key_id() | "` is not valid",
+        "sign key id `" | effective_sign_key_id | "` is not valid",
         EINVAL);
     }
 
@@ -560,7 +567,8 @@ void Installer::install_application_image(
                          ? sys::Version::from_u16(attributes.version())
                          : sys::Version(options.version());
 
-  const NameString name = is_save_locally ? fs::Path::name(options.destination()) : project_name();
+  const NameString name
+    = is_save_locally ? fs::Path::name(options.destination()) : project_name();
 
   attributes.set_name(name + options.suffix())
     .set_id(project_id())
@@ -586,10 +594,13 @@ void Installer::install_application_image(
   const auto is_signature_required
     = !options.destination().is_empty()
         ? false
-        : Appfs(Appfs::Construct(), connection()->driver()).is_signature_required();
+        : Appfs(Appfs::Construct(), connection()->driver())
+            .is_signature_required();
   API_RETURN_IF_ERROR();
 
-  if (options.sign_key_id().is_empty() && is_signature_required) {
+  if (
+    options.sign_key_id().is_empty() && options.default_sign_key_id().is_empty()
+    && is_signature_required) {
     CLOUD_PRINTER_TRACE("no key provided, but a signature is required");
     const auto signature_info = sos::Auth::get_signature_info(image.seek(0));
     if (signature_info.signature().is_valid() == false) {
@@ -602,7 +613,9 @@ void Installer::install_application_image(
     }
   }
 
-  if (options.sign_key_id().is_empty() == false) {
+  if (
+    options.sign_key_id().is_empty() == false
+    || options.default_sign_key_id().is_empty() == false) {
 
     if (options.sign_key_password().is_empty()) {
       API_RETURN_ASSIGN_ERROR("cannot use keys id without a password", EINVAL);
@@ -614,10 +627,14 @@ void Installer::install_application_image(
         EINVAL);
     }
 
-    Keys keys_document(options.sign_key_id());
+    const auto effective_sign_key_id = options.sign_key_id().is_empty()
+                                         ? options.default_sign_key_id()
+                                         : options.sign_key_id();
+
+    Keys keys_document(effective_sign_key_id);
     if (keys_document.is_valid() == false) {
       API_RETURN_ASSIGN_ERROR(
-        "sign key id `" | options.sign_key_id() | "` is not valid",
+        "sign key id `" | effective_sign_key_id | "` is not valid",
         EINVAL);
     }
     API_RETURN_IF_ERROR();
@@ -802,15 +819,15 @@ void Installer::reconnect(const Install &options) {
     options.delay().milliseconds()));
 
   printer().set_progress_key("reconnecting");
-	for (u32 i = 0; i < options.retry_reconnect_count(); i++) {
+  for (u32 i = 0; i < options.retry_reconnect_count(); i++) {
     connection()->reconnect(1, options.delay());
     API_RESET_ERROR();
     printer().update_progress(
       static_cast<int>(i),
       api::ProgressCallback::indeterminate_progress_total());
-		if (is_success() && connection()->is_connected()) {
-			break;
-		}
+    if (is_success() && connection()->is_connected()) {
+      break;
+    }
   }
 
   printer().update_progress(0, 0);
