@@ -27,6 +27,9 @@ public:
   publish(const JsonValue &input, const chrono::MicroTime &timeout);
 
   crypto::DigitalSignatureAlgorithm get_digital_signature_algorithm(const crypto::Aes::Key & key) const;
+  crypto::Aes::Key256 get_key256(const crypto::Aes::Key & key) const;
+
+  bool is_password_required() const;
 
   crypto::Dsa::PublicKey get_dsa_public_key() const {
     return crypto::Dsa::PublicKey(get_public_key());
@@ -40,6 +43,7 @@ public:
   JSON_ACCESS_STRING(Keys, status);
   JSON_ACCESS_STRING(Keys, name);
   JSON_ACCESS_STRING(Keys, iv);
+  JSON_ACCESS_STRING_WITH_KEY(Keys, secureKey256, secure_key_256);
   JSON_ACCESS_INTEGER_WITH_KEY(Keys, privateKeySize, private_key_size);
   JSON_ACCESS_STRING_WITH_KEY(Keys, publicKey, public_key);
   JSON_ACCESS_STRING_WITH_KEY(Keys, privateKey, private_key);
