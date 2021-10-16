@@ -579,19 +579,7 @@ void Installer::install_application_image(
                          ? sys::Version::from_u16(attributes.version())
                          : sys::Version(options.version());
 
-  auto local_destination = [&]() -> var::PathString {
-    var::PathString result = options.destination();
-    const var::StringView host_prefix = "host@";
-    if( result.string_view().find(host_prefix) == 0){
-      result.pop_front(host_prefix.length());
-    }
-    return result;
-  }();
-
-  const NameString name
-    = is_save_locally ? local_destination.string_view() : project_name();
-
-  attributes.set_name(name + options.suffix())
+  attributes.set_name(project_name() + options.suffix())
     .set_id(project_id())
     .set_startup(options.is_startup())
     .set_flash(is_flash_available)
@@ -710,6 +698,7 @@ void Installer::install_application_image(
   }
 
   if (options.is_clean()) {
+    CLOUD_PRINTER_TRACE("clean applications");
     clean_application();
   }
 
@@ -719,6 +708,7 @@ void Installer::install_application_image(
     API_RETURN_ASSIGN_ERROR("not connected", EIO);
   }
 
+  CLOUD_PRINTER_TRACE("start install");
   printer().set_progress_key("installing");
   chrono::ClockTimer transfer_timer;
   transfer_timer.start();
@@ -737,6 +727,7 @@ void Installer::install_application_image(
   if (is_success()) {
     print_transfer_info(image, transfer_timer);
   } else {
+    CLOUD_PRINTER_TRACE("failed to install");
     switch (error().error_number()) {
     case ENOSPC:
       API_RETURN_ASSIGN_ERROR("no space left on the target", ENOSPC);
