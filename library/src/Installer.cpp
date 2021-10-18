@@ -33,14 +33,13 @@ Installer &Installer::install(const Install &options) {
       set_architecture(build_architecture);
     }
 
-    //architecture from the options?
+    // architecture from the options?
     if (options.architecture().is_empty() == false) {
       set_architecture(options.architecture());
     }
 
-
-    //is this a cloud ID install - check arch later
-    if( !options.project_id().is_empty() || !options.url().is_empty() ){
+    // is this a cloud ID install - check arch later
+    if (!options.project_id().is_empty() || !options.url().is_empty()) {
       CLOUD_PRINTER_TRACE("resolve arch later");
     } else if (architecture().is_empty()) {
       API_RETURN_VALUE_ASSIGN_ERROR(
@@ -105,10 +104,11 @@ void Installer::install_id(const Install &options) {
   set_project_name(p.get_name());
   set_project_id(p.get_document_id());
 
-  //is this an OS project or an application project
-  if( p.get_type() == Build::application_type() && architecture().is_empty() ){
+  // is this an OS project or an application project
+  if (p.get_type() == Build::application_type() && architecture().is_empty()) {
     API_RETURN_ASSIGN_ERROR(
-      "Architecture for application cloud id must be specified manually if not connected",
+      "Architecture for application cloud id must be specified manually if not "
+      "connected",
       EINVAL);
   }
 
@@ -579,7 +579,11 @@ void Installer::install_application_image(
                          ? sys::Version::from_u16(attributes.version())
                          : sys::Version(options.version());
 
-  attributes.set_name(project_name() + options.suffix())
+  const String name = options.application_name().is_empty()
+                        ? project_name() + options.suffix()
+                        : String(options.application_name());
+
+  attributes.set_name(name)
     .set_id(project_id())
     .set_startup(options.is_startup())
     .set_flash(is_flash_available)

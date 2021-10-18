@@ -46,6 +46,7 @@ public:
     API_ACCESS_COMPOUND(Install, var::StringView, destination);
     API_ACCESS_COMPOUND(Install, var::StringView, suffix);
     API_ACCESS_COMPOUND(Install, var::StringView, architecture);
+    API_ACCESS_COMPOUND(Install, var::StringView, application_name);
     API_ACCESS_BOOL(Install, tightly_coupled_data, false);
     API_ACCESS_BOOL(Install, tightly_coupled_code, false);
     API_ACCESS_BOOL(Install, external_data, false);
