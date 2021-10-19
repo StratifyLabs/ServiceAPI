@@ -986,7 +986,7 @@ Installer &Installer::clean_application(const var::StringView name) {
   thread_argument.printer = &printer();
 
   Thread progress_thread(
-    Thread::Attributes().set_detach_state(Thread::DetachState::joinable),
+    Thread::Attributes().set_detached(),
     Thread::Construct()
       .set_argument(&thread_argument)
       .set_function([](void *args) -> void * {
@@ -1023,7 +1023,12 @@ Installer &Installer::clean_application(const var::StringView name) {
     Mutex::Guard mg(thread_argument.mutex);
     thread_argument.is_clean_complete = true;
   }
-  progress_thread.join();
+
+  while( progress_thread.is_running() ){
+    wait(10_milliseconds);
+  }
+
+
   return *this;
 }
 
