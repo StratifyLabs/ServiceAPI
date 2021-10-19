@@ -33,9 +33,10 @@ Installer &Installer::install(const Install &options) {
       set_architecture(build_architecture);
     }
 
-    if( options.destination().is_empty() == false ){
-      const auto dest_architecture = Build::get_architecture(options.destination());
-      if( dest_architecture.is_empty() == false ){
+    if (options.destination().is_empty() == false) {
+      const auto dest_architecture
+        = Build::get_architecture(options.destination());
+      if (dest_architecture.is_empty() == false) {
         set_architecture(dest_architecture);
       }
     }
@@ -979,6 +980,7 @@ Installer &Installer::clean_application(const var::StringView name) {
   struct ThreadArgument {
     Printer *printer;
     Mutex mutex;
+    Cond cond = Cond(mutex);
     bool is_clean_complete;
   };
 
@@ -1001,13 +1003,17 @@ Installer &Installer::clean_application(const var::StringView name) {
             count++,
             api::ProgressCallback::indeterminate_progress_total());
           {
-            Mutex::Guard mg(thread_argument->mutex);
+            Mutex::Scope ms(thread_argument->mutex);
             is_complete = thread_argument->is_clean_complete;
           }
           wait(250_milliseconds);
         } while (is_complete == false);
         printer->set_progress_key("progress");
         printer->update_progress(0, 0);
+        {
+          Mutex::Scope ms(thread_argument->mutex);
+          thread_argument->cond.set_asserted().signal();
+        }
         return nullptr;
       }));
 
@@ -1020,14 +1026,11 @@ Installer &Installer::clean_application(const var::StringView name) {
   }
 
   {
-    Mutex::Guard mg(thread_argument.mutex);
+    Mutex::Scope ms(thread_argument.mutex);
     thread_argument.is_clean_complete = true;
   }
 
-  while( progress_thread.is_running() ){
-    wait(10_milliseconds);
-  }
-
+  thread_argument.cond.wait_until_asserted();
 
   return *this;
 }
