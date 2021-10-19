@@ -33,6 +33,13 @@ Installer &Installer::install(const Install &options) {
       set_architecture(build_architecture);
     }
 
+    if( options.destination().is_empty() == false ){
+      const auto dest_architecture = Build::get_architecture(options.destination());
+      if( dest_architecture.is_empty() == false ){
+        set_architecture(dest_architecture);
+      }
+    }
+
     // architecture from the options?
     if (options.architecture().is_empty() == false) {
       set_architecture(options.architecture());
