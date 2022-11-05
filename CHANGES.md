@@ -1,3 +1,9 @@
+# Version 1.2.0 (unreleased)
+
+## New Features
+
+- Use `cmsdk2_` family of functions
+
 # Version 1.1.0
 
 ## New Features
