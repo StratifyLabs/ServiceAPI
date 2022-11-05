@@ -18,7 +18,8 @@ Job::publish(const JsonValue &input, const chrono::MicroTime &timeout) {
 
   // does the job exists
   Job::Object job_object
-    = cloud_service().database()
+    = cloud_service()
+        .database()
         .get_value(object_path, cloud::Cloud::IsRequestShallow(true))
         .to_object();
 
@@ -45,10 +46,12 @@ Job::publish(const JsonValue &input, const chrono::MicroTime &timeout) {
     // wait for result to post
     do {
 
-      object = cloud_service().database().get_value(Path(object_path) / "output");
+      object
+        = cloud_service().database().get_value(Path(object_path) / "output");
       if (object.at(input_id).is_valid()) {
         // job is complete -- delete the output
-        cloud_service().database().remove_object(Path(object_path) / "output" / input_id);
+        cloud_service().database().remove_object(
+          Path(object_path) / "output" / input_id);
         return IOValue("", object.at(input_id)).decrypt_value(crypto_key);
       }
       wait(5_seconds);
@@ -74,9 +77,7 @@ void Job::IOValue::encrypt_value(
   const crypto::Aes::Key &key) {
 
   var::String string_value
-    = JsonDocument()
-        .set_flags(JsonDocument::Flags::compact)
-        .stringify(value);
+    = JsonDocument().set_flags(JsonDocument::Flags::compact).stringify(value);
   const size_t padding = Aes::get_padding(string_value.length());
   string_value += (String("\n") * padding);
 
@@ -149,14 +150,13 @@ Job::Server::start(const var::StringView type, const Job &job_document) {
   m_timeout_timer.restart();
   fs::LambdaFile listen_file;
 
-  listen_file.set_context(this).set_write_callback(
-    [](void *context, int location, const var::View view) -> int {
+  listen_file.set_write_callback(
+    [this](int location, const var::View view) -> int {
       MCU_UNUSED_ARGUMENT(location);
-      Job::Server *self = reinterpret_cast<Job::Server *>(context);
-      self->process_input(JsonDocument().from_string(
+      process_input(JsonDocument().from_string(
         StringView(view.to_const_char(), view.size())));
 
-      return self->is_stop() == false ? view.size() : -1;
+      return is_stop() == false ? view.size() : -1;
     });
 
   cloud_service().database().listen(job_path, listen_file);
@@ -187,7 +187,8 @@ void Job::Server::process_input(const json::JsonValue &data) {
           Job::IOValue("", crypto_key(), output).get_value(),
           input.key());
 
-        cloud_service().database().remove_object(Path(path) / "input" / input.key());
+        cloud_service().database().remove_object(
+          Path(path) / "input" / input.key());
       }
     }
   } else {

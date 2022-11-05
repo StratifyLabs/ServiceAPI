@@ -68,7 +68,7 @@ void Document::update_is_existing() {
       CLOUD_PRINTER_TRACE(
         "Checking to see if " | get_document_id() | " exists in the cloud");
       api::ErrorGuard error_guard;
-      cloud_service().store().get_document(get_path_with_id());
+      api::ignore = cloud_service().store().get_document(get_path_with_id());
       m_is_existing = is_success();
       CLOUD_PRINTER_TRACE(
         get_document_id() | " exists? " | (m_is_existing ? "true" : "false"));

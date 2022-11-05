@@ -712,6 +712,7 @@ void Installer::install_application_image(
   if (options.is_clean()) {
     CLOUD_PRINTER_TRACE("clean applications");
     clean_application();
+    CLOUD_PRINTER_TRACE("clean applications complete");
   }
 
   printer().object("appfsAttributes", attributes);
@@ -977,61 +978,39 @@ Installer &Installer::clean_application(const var::StringView name) {
   const auto unlink_flash_app = var::PathString("/app/flash") / name;
   const auto unlink_ram_app = var::PathString("/app/ram") / name;
 
-  struct ThreadArgument {
-    Printer *printer;
-    Mutex mutex;
-    Cond cond = Cond(mutex);
-    bool is_clean_complete;
-  };
+  Mutex mutex;
+  auto cond = Cond(mutex);
 
-  ThreadArgument thread_argument;
-  thread_argument.printer = &printer();
-
-  Thread progress_thread(
-    Thread::Attributes().set_detached(),
-    Thread::Construct()
-      .set_argument(&thread_argument)
-      .set_function([](void *args) -> void * {
-        ThreadArgument *thread_argument
-          = reinterpret_cast<ThreadArgument *>(args);
-        Printer *printer = thread_argument->printer;
-        printer->set_progress_key("clean");
-        bool is_complete = false;
-        int count = 0;
+  auto progress_thread
+    = Thread(Thread::Attributes().set_joinable(), [&]() -> void * {
+        printer().set_progress_key("clean");
+        auto is_complete = false;
+        auto count = 0;
         do {
-          printer->update_progress(
+          printer().update_progress(
             count++,
             api::ProgressCallback::indeterminate_progress_total());
-          {
-            Mutex::Scope ms(thread_argument->mutex);
-            is_complete = thread_argument->is_clean_complete;
-          }
           wait(250_milliseconds);
-        } while (is_complete == false);
-        printer->set_progress_key("progress");
-        printer->update_progress(0, 0);
-        {
-          Mutex::Scope ms(thread_argument->mutex);
-          thread_argument->cond.set_asserted().signal();
-        }
+        } while (!cond.is_asserted());
+        printer().set_progress_key("progress").update_progress(0, 0);
         return nullptr;
-      }));
+      });
 
+
+  CLOUD_PRINTER_TRACE("unlink " | unlink_flash_app);
   while (fs.exists(unlink_flash_app)) {
     fs.remove(unlink_flash_app);
   }
 
+  CLOUD_PRINTER_TRACE("unlink " | unlink_ram_app);
   while (fs.exists(unlink_ram_app)) {
     fs.remove(unlink_ram_app);
   }
 
-  {
-    Mutex::Scope ms(thread_argument.mutex);
-    thread_argument.is_clean_complete = true;
-  }
-
-  thread_argument.cond.wait_until_asserted();
-
+  cond.set_asserted();
+  CLOUD_PRINTER_TRACE("wait progress");
+  progress_thread.join();
+  CLOUD_PRINTER_TRACE("Done");
   return *this;
 }
 
